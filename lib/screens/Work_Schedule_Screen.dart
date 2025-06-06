@@ -5,24 +5,24 @@ class WorkScheduleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheduleData = [
+    final List<Map<String, dynamic>> schedule = [
       {
-        'date': 'Thứ 2, 20/05',
-        'shift': '08:00 - 17:00',
+        'date': 'Thứ 2 - 20/05/2024',
+        'shift': 'Ca sáng',
         'status': 'Đã chấm công',
-        'color': Colors.green
+        'color': Colors.green,
       },
       {
-        'date': 'Thứ 3, 21/05',
-        'shift': '08:00 - 17:00',
+        'date': 'Thứ 3 - 21/05/2024',
+        'shift': 'Ca chiều',
         'status': 'Chưa chấm công',
-        'color': Colors.red
+        'color': Colors.orange,
       },
       {
-        'date': 'Thứ 4, 22/05',
+        'date': 'Thứ 4 - 22/05/2024',
         'shift': 'Nghỉ',
-        'status': 'Nghỉ phép',
-        'color': Colors.orange
+        'status': 'Không làm việc',
+        'color': Colors.grey,
       },
     ];
 
@@ -33,17 +33,21 @@ class WorkScheduleScreen extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: ListView.builder(
-        itemCount: scheduleData.length,
+        itemCount: schedule.length,
         itemBuilder: (context, index) {
-          final item = scheduleData[index];
+          final item = schedule[index];
+          final String date = item['date'] as String;
+          final String shift = item['shift'] as String;
+          final String status = item['status'] as String;
+          final Color color = item['color'] as Color;
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: ListTile(
-              leading: Icon(Icons.calendar_today, color: item['color']),
-              title: Text(item['date'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Ca: ${item['shift']}\nTrạng thái: ${item['status']}'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              isThreeLine: true,
+              title: Text(date),
+              subtitle: Text('$shift - $status'),
+              tileColor: color.withOpacity(0.1),
+              leading: Icon(Icons.calendar_today, color: color),
             ),
           );
         },

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../../sondoannam/hotel_project"
+		},
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../flutter-app"
+		}
+	],
+	"settings": {}
+}

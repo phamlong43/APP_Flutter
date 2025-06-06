@@ -43,18 +43,8 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        final offsetAnimation = animation.drive(
-                          Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-                              .chain(CurveTween(curve: Curves.easeInOut)),
-                        );
-                        return SlideTransition(position: offsetAnimation, child: child);
-                      },
-                    ),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
                   );
                 },
                 style: ElevatedButton.styleFrom(

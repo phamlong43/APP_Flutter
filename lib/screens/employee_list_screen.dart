@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/employee.dart';
-import '../widgets/employee_card.dart';
 import 'employee_detail_screen.dart';
 
 class EmployeeListScreen extends StatelessWidget {
@@ -30,18 +29,34 @@ class EmployeeListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Danh sách nhân sự')),
-      body: ListView.builder(
+      appBar: AppBar(title: const Text('Danh sách nhân viên')),
+      body: ListView.separated(
         itemCount: employees.length,
+        separatorBuilder: (context, index) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          return EmployeeCard(
-            employee: employees[index],
+          final employee = employees[index];
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue.shade100,
+              child: Text(
+                employee.name[0],
+                style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+              ),
+            ),
+            title: Text(
+              employee.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              '${employee.position}\n${employee.email}',
+              style: const TextStyle(height: 1.3),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder:
-                      (_) => EmployeeDetailScreen(employee: employees[index]),
+                  builder: (_) => EmployeeDetailScreen(employee: employee),
                 ),
               );
             },
