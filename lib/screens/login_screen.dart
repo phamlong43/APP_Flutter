@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../db/database_helper.dart';
+import '../services/user_api.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
 import 'welcome_screen.dart';
@@ -26,8 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
-    final dbHelper = DatabaseHelper();
-    final userData = await dbHelper.loginUser(username, password);
+    final userData = await UserApi.loginUser(username, password);
 
     if (!mounted) return;
 
@@ -36,20 +35,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (userData != null) {
-      final String userRole = userData['role'] as String? ?? 'user';
-      final int userId = userData['id'] as int;
+      final String userRole = (userData['role'] as String? ?? 'USER').toUpperCase();
+      final int userId = userData['id'] is int ? userData['id'] : int.tryParse(userData['id'].toString()) ?? 0;
       final String username = userData['username'] as String;
-      final bool isAdmin = userRole == 'admin';
-
+      final bool isAdmin = userRole == 'ADMIN';
       final String message =
           isAdmin
               ? '🎉 Đăng nhập thành công! (Admin)'
               : '🎉 Đăng nhập thành công!';
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(

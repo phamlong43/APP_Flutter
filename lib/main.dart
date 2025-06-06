@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/welcome_screen.dart';
-import 'db/database_helper.dart';
+import 'services/user_api.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +20,10 @@ void main() async {
 
 // Hàm tạo tài khoản admin nếu chưa tồn tại
 Future<void> createAdminAccount() async {
-  final dbHelper = DatabaseHelper();
   try {
-    // Kiểm tra xem tài khoản admin đã tồn tại chưa
-    final adminUser = await dbHelper.getUserByUsername('admin');
+    final adminUser = await UserApi.getUserByUsername('admin');
     if (adminUser == null) {
-      // Nếu chưa tồn tại, tạo tài khoản admin
-      await dbHelper.registerUser('admin', 'admin123', role: 'admin');
+      await UserApi.registerUser('admin', 'admin123', role: 'admin');
       debugPrint('Tài khoản admin đã được tạo thành công');
     } else {
       debugPrint('Tài khoản admin đã tồn tại');

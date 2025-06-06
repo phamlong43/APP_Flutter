@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_testt/screens/AddWorkHoursScreen.dart';
 import 'package:flutter_testt/screens/report_screen.dart';
 import '../db/database_helper.dart';
-import '../services/auth_service.dart';
 import 'work_approval_screen.dart';
 import 'create_work_item_screen.dart';
 import 'user_work_items_screen.dart';
 import 'workscreen.dart';
 import 'internalcommunicationscreen.dart';
 import 'Personal_Information_Screen.dart';
+import 'Personal_Information_View_Screen.dart';
 import 'employee_list_screen.dart';
 import 'welcome_screen.dart';
 // Import tất cả các màn hình placeholder
@@ -235,8 +235,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 },
-                child: const Icon(Icons.add),
                 backgroundColor: Colors.blue,
+                child: const Icon(Icons.add),
               ),
       bottomNavigationBar: BottomNavigationBar(
         selectedItemColor: Colors.blue,
@@ -615,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const PersonalInformationScreen(),
+                          builder: (_) => PersonalInformationViewScreen(username: widget.username),
                         ),
                       );
                     },

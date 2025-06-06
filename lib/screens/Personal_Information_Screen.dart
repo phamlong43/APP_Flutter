@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class PersonalInformationScreen extends StatefulWidget {
   const PersonalInformationScreen({super.key});
@@ -10,10 +12,106 @@ class PersonalInformationScreen extends StatefulWidget {
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  String gender = 'Nam';
-  String maritalStatus = 'Độc thân';
-  String education = 'Đại học';
-  String nationality = 'Việt Nam';
+  // Thông tin cá nhân
+  Map<String, dynamic> userInfo = {};
+  bool isLoading = true;
+
+  // Controllers cho các trường nhập liệu
+  final TextEditingController employeeCodeController = TextEditingController();
+  final TextEditingController fullNameController = TextEditingController();
+  final TextEditingController mobileController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController dateOfBirthController = TextEditingController();
+  final TextEditingController placeOfBirthController = TextEditingController();
+  final TextEditingController idNumberController = TextEditingController();
+  final TextEditingController idIssuedPlaceController = TextEditingController();
+  final TextEditingController idIssuedDateController = TextEditingController();
+  final TextEditingController ethnicityController = TextEditingController();
+  final TextEditingController religionController = TextEditingController();
+  final TextEditingController nationalityController = TextEditingController();
+  final TextEditingController maritalStatusController = TextEditingController();
+  final TextEditingController educationController = TextEditingController();
+  final TextEditingController permanentAddressController = TextEditingController();
+  final TextEditingController temporaryAddressController = TextEditingController();
+  final TextEditingController departmentController = TextEditingController();
+  final TextEditingController positionController = TextEditingController();
+  final TextEditingController workStatusController = TextEditingController();
+
+  String gender = '';
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUserInfo();
+  }
+
+  @override
+  void dispose() {
+    // Giải phóng controller
+    employeeCodeController.dispose();
+    fullNameController.dispose();
+    mobileController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    dateOfBirthController.dispose();
+    placeOfBirthController.dispose();
+    idNumberController.dispose();
+    idIssuedPlaceController.dispose();
+    idIssuedDateController.dispose();
+    ethnicityController.dispose();
+    religionController.dispose();
+    nationalityController.dispose();
+    maritalStatusController.dispose();
+    educationController.dispose();
+    permanentAddressController.dispose();
+    temporaryAddressController.dispose();
+    departmentController.dispose();
+    positionController.dispose();
+    workStatusController.dispose();
+    super.dispose();
+  }
+
+  Future<void> fetchUserInfo() async {
+    // TODO: Thay userId bằng id thực tế của user đang đăng nhập
+    const userId = '1';
+    final url = Uri.parse('http://10.0.2.2:8080/users/$userId');
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        setState(() {
+          userInfo = jsonDecode(response.body);
+          // Gán dữ liệu vào controller
+          employeeCodeController.text = userInfo['employeeCode'] ?? '';
+          fullNameController.text = userInfo['fullName'] ?? '';
+          gender = userInfo['gender'] ?? '';
+          mobileController.text = userInfo['mobile'] ?? '';
+          emailController.text = userInfo['email'] ?? '';
+          phoneController.text = userInfo['phone'] ?? '';
+          dateOfBirthController.text = userInfo['dateOfBirth'] ?? '';
+          placeOfBirthController.text = userInfo['placeOfBirth'] ?? '';
+          idNumberController.text = userInfo['idNumber'] ?? '';
+          idIssuedPlaceController.text = userInfo['idIssuedPlace'] ?? '';
+          idIssuedDateController.text = userInfo['idIssuedDate'] ?? '';
+          ethnicityController.text = userInfo['ethnicity'] ?? '';
+          religionController.text = userInfo['religion'] ?? '';
+          nationalityController.text = userInfo['nationality'] ?? '';
+          maritalStatusController.text = userInfo['maritalStatus'] ?? '';
+          educationController.text = userInfo['education'] ?? '';
+          permanentAddressController.text = userInfo['permanentAddress'] ?? '';
+          temporaryAddressController.text = userInfo['temporaryAddress'] ?? '';
+          departmentController.text = userInfo['department'] ?? '';
+          positionController.text = userInfo['position'] ?? '';
+          workStatusController.text = userInfo['workStatus'] ?? '';
+          isLoading = false;
+        });
+      } else {
+        setState(() { isLoading = false; });
+      }
+    } catch (e) {
+      setState(() { isLoading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,70 +121,69 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundImage: AssetImage('assets/user1.png'),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('NGUYỄN VĂN NAM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('S1_00050', style: TextStyle(color: Colors.red)),
-                      Text('Bộ phận Marketing\nTrưởng phòng'),
-                      SizedBox(height: 8),
-                      Chip(
-                        label: Text('Đang làm việc', style: TextStyle(color: Colors.white)),
-                        backgroundColor: Colors.green,
-                      ),
-                    ],
-                  ),
-                ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 40,
+                          backgroundImage: AssetImage('assets/user1.png'),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(fullNameController.text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(employeeCodeController.text, style: const TextStyle(color: Colors.red)),
+                            Text((departmentController.text) + (positionController.text.isNotEmpty ? '\n${positionController.text}' : '')),
+                            const SizedBox(height: 8),
+                            if ((workStatusController.text).isNotEmpty)
+                              Chip(
+                                label: Text(workStatusController.text, style: const TextStyle(color: Colors.white)),
+                                backgroundColor: Colors.green,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildInputField(label: 'Mã nhân viên', controller: employeeCodeController),
+                    _buildInputField(label: 'Họ và tên', controller: fullNameController),
+                    _buildDropdown(label: 'Giới tính', value: gender, items: ['Nam', 'Nữ'], onChanged: (val) { setState(() { gender = val ?? ''; }); }),
+                    _buildInputField(label: 'SĐT di động', controller: mobileController),
+                    _buildInputField(label: 'Email', controller: emailController),
+                    _buildInputField(label: 'Điện thoại bàn', controller: phoneController),
+                    const Divider(height: 32),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Thông tin thêm', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInputField(label: 'Ngày sinh', controller: dateOfBirthController),
+                    _buildInputField(label: 'Nơi sinh', controller: placeOfBirthController),
+                    _buildInputField(label: 'Số CMND/CCCD', controller: idNumberController),
+                    _buildInputField(label: 'Nơi cấp CMND/CCCD', controller: idIssuedPlaceController),
+                    _buildInputField(label: 'Ngày cấp CMND/CCCD', controller: idIssuedDateController),
+                    _buildInputField(label: 'Dân tộc', controller: ethnicityController),
+                    _buildInputField(label: 'Tôn giáo', controller: religionController),
+                    _buildInputField(label: 'Quốc tịch', controller: nationalityController),
+                    _buildInputField(label: 'Tình trạng hôn nhân', controller: maritalStatusController),
+                    _buildInputField(label: 'Học vấn', controller: educationController),
+                    _buildInputField(label: 'Địa chỉ thường trú', controller: permanentAddressController),
+                    _buildInputField(label: 'Địa chỉ tạm trú', controller: temporaryAddressController),
+                    _buildInputField(label: 'Bộ phận/phòng ban', controller: departmentController),
+                    _buildInputField(label: 'Chức vụ', controller: positionController),
+                    _buildInputField(label: 'Trạng thái làm việc', controller: workStatusController),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              _buildInputField(label: 'Mã nhân viên', initialValue: 'S1_00050', enabled: false),
-              _buildInputField(label: 'Họ và tên', initialValue: 'Nguyễn Văn Nam'),
-              _buildDropdown(label: 'Giới tính', value: gender, items: ['Nam', 'Nữ'], onChanged: (val) {
-                setState(() => gender = val!);
-              }),
-              _buildInputField(label: 'SĐT di động', initialValue: '0901909195'),
-              _buildInputField(label: 'Email', initialValue: 'nam.nguyen@hror'),
-              _buildInputField(label: 'Điện thoại bàn'),
-              const Divider(height: 32),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Thông tin thêm', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 8),
-              _buildInputField(label: 'Ngày sinh', initialValue: '14/05/2003'),
-              _buildInputField(label: 'Nơi sinh', initialValue: 'Hà Tây'),
-              _buildInputField(label: 'Số CMND', initialValue: '331655196'),
-              _buildInputField(label: 'Nơi cấp CMND', initialValue: 'Hà Tây'),
-              _buildInputField(label: 'Ngày cấp CMND', initialValue: '14/03/2021'),
-              _buildDropdown(label: 'Dân tộc', value: 'Kinh', items: ['Kinh', 'Khác'], onChanged: (_) {}),
-              _buildDropdown(label: 'Tôn giáo', value: 'Không có', items: ['Không có', 'Khác'], onChanged: (_) {}),
-              _buildDropdown(label: 'Quốc tịch', value: nationality, items: ['Việt Nam', 'Khác'], onChanged: (val) {
-                setState(() => nationality = val!);
-              }),
-              const SizedBox(height: 16),
-              _buildMaritalStatusSelector(),
-              _buildDropdown(label: 'Học vấn', value: education, items: ['Đại học', 'Cao đẳng', 'THPT'], onChanged: (val) {
-                setState(() => education = val!);
-              }),
-              _buildInputField(label: 'Địa chỉ thường trú', initialValue: 'Vĩnh Long'),
-              _buildInputField(label: 'Địa chỉ tạm trú', initialValue: 'Hồ Chí Minh'),
-            ],
-          ),
-        ),
-      ),
+            ),
       bottomNavigationBar: Container(
         color: Colors.grey[100],
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
@@ -106,11 +203,11 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     );
   }
 
-  Widget _buildInputField({required String label, String? initialValue, bool enabled = true}) {
+  Widget _buildInputField({required String label, TextEditingController? controller, bool enabled = true}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextFormField(
-        initialValue: initialValue,
+        controller: controller,
         enabled: enabled,
         decoration: InputDecoration(
           labelText: label,
@@ -129,7 +226,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: DropdownButtonFormField<String>(
-        value: value,
+        value: value.isNotEmpty ? value : null,
         onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
@@ -137,22 +234,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         ),
         items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
       ),
-    );
-  }
-
-  Widget _buildMaritalStatusSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Tình trạng hôn nhân', style: TextStyle(fontWeight: FontWeight.bold)),
-        Row(
-          children: [
-            Expanded(child: RadioListTile(value: 'Độc thân', groupValue: maritalStatus, onChanged: (val) => setState(() => maritalStatus = val!), title: const Text('Độc thân'))),
-            Expanded(child: RadioListTile(value: 'Có gia đình', groupValue: maritalStatus, onChanged: (val) => setState(() => maritalStatus = val!), title: const Text('Có gia đình'))),
-            Expanded(child: RadioListTile(value: 'Ly hôn', groupValue: maritalStatus, onChanged: (val) => setState(() => maritalStatus = val!), title: const Text('Ly hôn'))),
-          ],
-        ),
-      ],
     );
   }
 }
