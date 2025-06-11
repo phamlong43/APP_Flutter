@@ -11,13 +11,22 @@ import 'Personal_Information_Screen.dart';
 import 'Personal_Information_View_Screen.dart';
 import 'employee_list_screen.dart';
 import 'welcome_screen.dart';
-// Import tất cả các màn hình placeholder
+import 'change_password_screen.dart' as real_change_password;
 import 'placeholder_screens.dart'
     hide
         WorkScreen,
         InternalCommunicationScreen,
         PersonalInformationScreen,
         EmployeeListScreen;
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'assign_task_screen.dart';
+import '../services/task_api.dart';
+import 'task_list_screen.dart';
+import 'components/admin_stat_cards.dart';
+import 'components/admin_quick_report_card.dart';
+import 'components/admin_recent_activity_card.dart';
+import 'admin_statistics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isAdmin;
@@ -40,6 +49,50 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 2;
 
   bool get isAdmin => widget.isAdmin;
+
+  List<dynamic> _users = [];
+  bool _isLoadingUsers = false;
+  List<Map<String, dynamic>> _tasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (isAdmin) {
+      _fetchUsers();
+      _fetchTasks();
+    }
+  }
+
+  Future<void> _fetchUsers() async {
+    setState(() { _isLoadingUsers = true; });
+    try {
+      final response = await http.get(Uri.parse('http://10.0.2.2:8080/users')).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final allUsers = decoded is List ? decoded : [];
+        setState(() {
+          _users = allUsers.where((u) => (u['role'] ?? '').toString().toUpperCase() == 'USER').toList();
+          _isLoadingUsers = false;
+        });
+      } else {
+        setState(() { _isLoadingUsers = false; });
+      }
+    } catch (e) {
+      setState(() { _isLoadingUsers = false; });
+    }
+  }
+
+  Future<void> _fetchTasks() async {
+    setState(() { });
+    try {
+      final tasks = await TaskApi.getAllTasks();
+      setState(() {
+        _tasks = tasks;
+      });
+    } catch (e) {
+      setState(() { });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,12 +267,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const WorkApprovalScreen(),
+                      builder: (_) => AssignTaskScreen(allUsers: _users),
                     ),
                   );
                 },
-                label: const Text('Duyệt công việc'),
-                icon: const Icon(Icons.approval),
+                label: const Text('Giao nhiệm vụ'),
+                icon: const Icon(Icons.assignment_turned_in),
                 backgroundColor: Colors.blue,
               )
               : FloatingActionButton(
@@ -243,6 +296,10 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
         onTap: (index) {
+          if (index == 2 && isAdmin) {
+            _fetchUsers();
+            _fetchTasks(); // Đảm bảo luôn cập nhật số nhiệm vụ khi vào Trang chủ
+          }
           setState(() {
             _selectedIndex = index;
           });
@@ -282,6 +339,69 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMainHome() {
+    if (isAdmin) {
+      // Trang chủ cho admin: Thống kê nhanh
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Thống kê nhanh', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue)),
+            const SizedBox(height: 20),
+            AdminStatCards(
+              isLoadingUsers: _isLoadingUsers,
+              userCount: _users.length,
+              taskCount: _tasks.length,
+              onUserTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EmployeeListScreen(users: _users),
+                  ),
+                );
+              },
+              onTaskTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => TaskListScreen(tasks: _tasks)));
+              },
+              onApprovalTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkApprovalScreen()));
+              },
+            ),
+            const SizedBox(height: 24),
+            AdminQuickReportCard(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AdminStatisticsScreen(
+                      totalUsers: _users.length,
+                      onLeaveUsers: _users.where((u) => (u['work_status'] ?? '').toLowerCase().contains('nghỉ')).length,
+                      totalTasks: _tasks.length,
+                      completedTasks: _tasks.where((t) => t['status'] == 'completed').length,
+                      overdueTasks: _tasks.where((t) => t['status'] == 'overdue' || (t['dueDate'] != null && DateTime.tryParse(t['dueDate']) != null && DateTime.tryParse(t['dueDate'])!.isBefore(DateTime.now()) && t['status'] != 'completed')).length,
+                      users: _users.cast<Map<String, dynamic>>(),
+                      tasks: _tasks,
+                    ),
+                  ),
+                );
+              },
+              totalUsers: _users.length,
+              totalTasks: _tasks.length,
+              completedTasks: _tasks.where((t) => t['status'] == 'completed').length,
+              overdueTasks: _tasks.where((t) => t['status'] == 'overdue' || (t['dueDate'] != null && DateTime.tryParse(t['dueDate']) != null && DateTime.tryParse(t['dueDate'])!.isBefore(DateTime.now()) && t['status'] != 'completed')).length,
+              onLeaveUsers: _users.where((u) => (u['work_status'] ?? '').toLowerCase().contains('nghỉ')).length,
+            ),
+            const SizedBox(height: 24),
+            AdminRecentActivityCard(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen()));
+              },
+            ),
+          ],
+        ),
+      );
+    }
+    // Giao diện cho người dùng thường
     return Column(
       children: [
         // Admin approval section
@@ -456,6 +576,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              // Nhiệm vụ
+              _buildIconTile(
+                Icons.assignment_turned_in,
+                'Nhiệm vụ',
+                Colors.green,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TaskListScreen(tasks: _tasks),
+                    ),
+                  );
+                },
+              ),
               // chức năng bổ sung công
               _buildIconTile(
                 Icons.add_circle,
@@ -560,6 +694,46 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+        // Thêm ô nhiệm vụ ở trang chính cho user thường
+        if (!isAdmin)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TaskListScreen(tasks: _tasks),
+                  ),
+                );
+              },
+              child: Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.assignment_turned_in, color: Colors.blue, size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Nhiệm vụ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                            const SizedBox(height: 4),
+                            Text('Bạn có ${_tasks.length} nhiệm vụ', style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.blueGrey),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -628,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const ChangePasswordScreen(),
+                          builder: (_) => real_change_password.ChangePasswordScreen(username: widget.username),
                         ),
                       );
                     },
@@ -637,17 +811,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     leading: const Icon(Icons.edit),
                     title: const Text('Chữ ký điện tử'),
                     onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.assignment_turned_in_outlined),
-                    title: const Text('Nhiệm vụ'),
-                    onTap: () {
-                      Navigator.pop(context); // Đóng bottom sheet
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const TaskScreen()),
-                      );
-                    },
                   ),
 
                   ListTile(
@@ -694,7 +857,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const EmployeeListScreen(),
+                          builder: (_) => EmployeeListScreen(users: _users),
                         ),
                       );
                     },
