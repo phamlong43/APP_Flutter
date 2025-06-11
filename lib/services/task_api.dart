@@ -14,4 +14,16 @@ class TaskApi {
     }
     return [];
   }
+
+  static Future<List<Map<String, dynamic>>> getTasksByUsername(String username) async {
+    final url = 'http://10.0.2.2:8080/tasks/my?username=$username';
+    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return List<Map<String, dynamic>>.from(decoded);
+      }
+    }
+    return [];
+  }
 }

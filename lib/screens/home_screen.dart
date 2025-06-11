@@ -581,11 +581,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icons.assignment_turned_in,
                 'Nhiệm vụ',
                 Colors.green,
-                onTap: () {
+                onTap: () async {
+                  final tasks = await TaskApi.getTasksByUsername(widget.username);
+                  if (!mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TaskListScreen(tasks: _tasks),
+                      builder: (_) => TaskListScreen(tasks: tasks),
                     ),
                   );
                 },
@@ -691,46 +693,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text(
                 'Vào Ca',
                 style: TextStyle(fontSize: 18, color: Colors.white),
-              ),
-            ),
-          ),
-        // Thêm ô nhiệm vụ ở trang chính cho user thường
-        if (!isAdmin)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TaskListScreen(tasks: _tasks),
-                  ),
-                );
-              },
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.assignment_turned_in, color: Colors.blue, size: 32),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Nhiệm vụ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                            const SizedBox(height: 4),
-                            Text('Bạn có ${_tasks.length} nhiệm vụ', style: const TextStyle(fontSize: 14, color: Colors.black54)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.blueGrey),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),
