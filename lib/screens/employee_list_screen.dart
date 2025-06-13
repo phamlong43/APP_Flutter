@@ -1,10 +1,55 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'employee_detail_screen.dart';
 import '../models/employee.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class EmployeeListScreen extends StatelessWidget {
-  final List<dynamic> users;
-  const EmployeeListScreen({Key? key, required this.users}) : super(key: key);
+class EmployeeListScreen extends StatefulWidget {
+  const EmployeeListScreen({Key? key}) : super(key: key);
+
+  @override
+  State<EmployeeListScreen> createState() => _EmployeeListScreenState();
+}
+
+class _EmployeeListScreenState extends State<EmployeeListScreen> {
+  List<dynamic> users = [];
+  Timer? _timer;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUsers();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchUsers());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> fetchUsers() async {
+    if (_loading) return;
+    _loading = true;
+    try {
+      final response = await http.get(Uri.parse('http://10.0.2.2:8080/users')).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final List<dynamic> newUsers = json.decode(response.body);
+        if (!listEquals(newUsers, users)) {
+          setState(() {
+            users = newUsers;
+          });
+        }
+      }
+    } catch (e) {
+      // Handle error if needed
+    } finally {
+      _loading = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../db/database_helper.dart';
-import '../models/work_item.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'create_work_item_screen.dart';
+import '../models/work_item.dart';
 
 class UserWorkItemsScreen extends StatefulWidget {
   final String userId;
@@ -18,7 +19,6 @@ class UserWorkItemsScreen extends StatefulWidget {
 }
 
 class _UserWorkItemsScreenState extends State<UserWorkItemsScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
   List<WorkItem> _workItems = [];
   bool _isLoading = true;
 
@@ -32,14 +32,51 @@ class _UserWorkItemsScreenState extends State<UserWorkItemsScreen> {
     setState(() {
       _isLoading = true;
     });
-
-    final items = await _dbHelper.getUserWorkItems(widget.userId);
-    final workItems = items.map((item) => WorkItem.fromMap(item)).toList();
-
-    setState(() {
-      _workItems = workItems;
-      _isLoading = false;
-    });
+    try {
+      final response = await http.get(Uri.parse('http://10.0.2.2:8080/requests/my?username=${widget.userName}')).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data is List) {
+          final workItems = data.map<WorkItem>((item) => WorkItem(
+            id: item['id'] ?? 0,
+            title: item['title'] ?? '',
+            description: item['description'] ?? '',
+            status: item['status'] ?? '',
+            requestedDate: item['createdAt'] ?? '',
+            approvedDate: item['updatedAt'],
+            approvedBy: '',
+            type: item['requestType'] ?? '',
+            userId: widget.userId,
+            userName: widget.userName,
+          )).toList();
+          // Sắp xếp: các yêu cầu 'pending' lên đầu
+          workItems.sort((a, b) {
+            if (a.status == 'pending' && b.status != 'pending') return -1;
+            if (a.status != 'pending' && b.status == 'pending') return 1;
+            return 0;
+          });
+          setState(() {
+            _workItems = workItems;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _workItems = [];
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _workItems = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _workItems = [];
+        _isLoading = false;
+      });
+    }
   }
 
   String _getStatusText(String status) {
@@ -249,8 +286,8 @@ class _UserWorkItemsScreenState extends State<UserWorkItemsScreen> {
                     }
                   });
                 },
-                child: const Icon(Icons.add),
                 backgroundColor: Colors.blue,
+                child: const Icon(Icons.add),
               ),
     );
   }

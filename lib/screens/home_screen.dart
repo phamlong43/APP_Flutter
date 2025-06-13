@@ -7,7 +7,6 @@ import 'create_work_item_screen.dart';
 import 'user_work_items_screen.dart';
 import 'workscreen.dart';
 import 'internalcommunicationscreen.dart';
-import 'Personal_Information_Screen.dart';
 import 'Personal_Information_View_Screen.dart';
 import 'employee_list_screen.dart';
 import 'welcome_screen.dart';
@@ -27,6 +26,10 @@ import 'components/admin_stat_cards.dart';
 import 'components/admin_quick_report_card.dart';
 import 'components/admin_recent_activity_card.dart';
 import 'admin_statistics_screen.dart';
+import 'components/user_requests_widget.dart';
+import 'components/drawer_utils.dart';
+import 'components/icon_tile.dart';
+import 'digital_signature_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isAdmin;
@@ -83,15 +86,37 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchTasks() async {
-    setState(() { });
     try {
-      final tasks = await TaskApi.getAllTasks();
-      setState(() {
-        _tasks = tasks;
-      });
+      // Lấy danh sách nhiệm vụ (tasks) từ endpoint mới
+      final response = await http.get(Uri.parse('http://10.0.2.2:8080/tasks/all')).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final tasks = decoded is List ? List<Map<String, dynamic>>.from(decoded) : <Map<String, dynamic>>[];
+        if (_tasks.length != tasks.length || !_listEquals(_tasks, tasks)) {
+          setState(() {
+            _tasks = tasks;
+          });
+        }
+      }
     } catch (e) {
-      setState(() { });
+      // Không setState nếu lỗi, tránh gây giật UI
     }
+  }
+
+  bool _listEquals(List<Map<String, dynamic>> a, List<Map<String, dynamic>> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (!_mapEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  bool _mapEquals(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key) || a[key] != b[key]) return false;
+    }
+    return true;
   }
 
   @override
@@ -116,12 +141,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            _buildDrawerSectionTitle('WORKSPACE'),
+            buildDrawerSectionTitle('WORKSPACE'),
             ExpansionTile(
               leading: const Icon(Icons.extension),
               title: const Text('Tiện Ích'),
               children: [
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.chat_bubble_outline,
                   'Chat',
                   dense: true,
@@ -134,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 // lịch biểu
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.schedule,
                   'Lịch Biểu',
                   dense: true,
@@ -148,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 // Lịch làm
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.insert_drive_file,
                   'Tài Liệu',
                   dense: true,
@@ -160,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   },
                 ),
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.insert_drive_file,
                   'Hộp Thư Góp Ý',
                   dense: true,
@@ -180,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.work_outline),
               title: const Text('Công Việc'),
               children: [
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.assignment,
                   'Dự Án',
                   dense: true,
@@ -193,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
 
-                _buildDrawerItem(
+                buildDrawerItem(
                   Icons.task_alt,
                   'Công Việc',
                   dense: true,
@@ -204,8 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            _buildDrawerSectionTitle('HRM'),
-            _buildDrawerItem(
+            buildDrawerSectionTitle('HRM'),
+            buildDrawerItem(
               Icons.groups,
               'Nhân Sự',
               onTap: () {
@@ -217,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-            _buildDrawerItem(
+            buildDrawerItem(
               Icons.how_to_reg,
               'Tuyển Dụng',
               onTap: () {
@@ -229,8 +254,8 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-            _buildDrawerSectionTitle('SYSTEM'),
-            _buildDrawerItem(
+            buildDrawerSectionTitle('SYSTEM'),
+            buildDrawerItem(
               Icons.bar_chart,
               'Báo Cáo',
               dense: true,
@@ -350,13 +375,11 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
             AdminStatCards(
               isLoadingUsers: _isLoadingUsers,
-              userCount: _users.length,
-              taskCount: _tasks.length,
               onUserTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => EmployeeListScreen(users: _users),
+                    builder: (_) => const EmployeeListScreen(),
                   ),
                 );
               },
@@ -392,11 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onLeaveUsers: _users.where((u) => (u['work_status'] ?? '').toLowerCase().contains('nghỉ')).length,
             ),
             const SizedBox(height: 24),
-            AdminRecentActivityCard(
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen()));
-              },
-            ),
+            AdminRecentActivityCard(),
           ],
         ),
       );
@@ -506,54 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!isAdmin)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Yêu cầu của tôi ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    FutureBuilder<int>(
-                      future: DatabaseHelper().countPendingWorkItems(),
-                      builder: (context, snapshot) {
-                        final count = snapshot.data ?? 0;
-                        return CircleAvatar(
-                          radius: 10,
-                          backgroundColor: Colors.red,
-                          child: Text(
-                            count.toString(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => UserWorkItemsScreen(
-                              userId: widget.userId,
-                              userName: widget.username,
-                            ),
-                      ),
-                    );
-                  },
-                  child: const Text('Xem tất cả'),
-                ),
-              ],
-            ),
+            child: UserRequestsWidget(username: widget.username),
           ),
         Expanded(
           child: GridView.count(
@@ -563,10 +535,10 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSpacing: 12,
             children: [
               //  chức năng nghỉ phép
-              _buildIconTile(
-                Icons.edit_note,
-                'Nghỉ phép',
-                Colors.red,
+              IconTile(
+                icon: Icons.edit_note,
+                label: 'Nghỉ phép',
+                color: Colors.red,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -577,10 +549,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               // Nhiệm vụ
-              _buildIconTile(
-                Icons.assignment_turned_in,
-                'Nhiệm vụ',
-                Colors.green,
+              IconTile(
+                icon: Icons.assignment_turned_in,
+                label: 'Nhiệm vụ',
+                color: Colors.green,
                 onTap: () async {
                   final tasks = await TaskApi.getTasksByUsername(widget.username);
                   if (!mounted) return;
@@ -593,10 +565,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               // chức năng bổ sung công
-              _buildIconTile(
-                Icons.add_circle,
-                'Bổ sung công',
-                Colors.blue,
+              IconTile(
+                icon: Icons.add_circle,
+                label: 'Bổ sung công',
+                color: Colors.blue,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -607,10 +579,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               // hòm thư góp ý
-              _buildIconTile(
-                Icons.forum,
-                'Hộp thư góp ý',
-                Colors.orange,
+              IconTile(
+                icon: Icons.forum,
+                label: 'Hộp thư góp ý',
+                color: Colors.orange,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -620,11 +592,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-
-              _buildIconTile(
-                Icons.attach_money,
-                'Phiếu Tạm Ứng',
-                Colors.orange,
+              IconTile(
+                icon: Icons.attach_money,
+                label: 'Phiếu Tạm Ứng',
+                color: Colors.orange,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -635,10 +606,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               //lijlich su cham cong
-              _buildIconTile(
-                Icons.access_time,
-                'Lịch Sử Chấm Công',
-                Colors.lightBlue,
+              IconTile(
+                icon: Icons.access_time,
+                label: 'Lịch Sử Chấm Công',
+                color: Colors.lightBlue,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -650,10 +621,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
               // công tác
-              _buildIconTile(
-                Icons.flight_takeoff,
-                'Công tác',
-                Colors.deepOrange,
+              IconTile(
+                icon: Icons.flight_takeoff,
+                label: 'Công tác',
+                color: Colors.deepOrange,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -662,10 +633,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               // châm công ho
-              _buildIconTile(
-                Icons.location_on,
-                'Công tác',
-                Colors.pink,
+              IconTile(
+                icon: Icons.location_on,
+                label: 'Công tác',
+                color: Colors.pink,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -697,35 +668,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildIconTile(
-    IconData icon,
-    String label,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -772,7 +714,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ListTile(
                     leading: const Icon(Icons.edit),
                     title: const Text('Chữ ký điện tử'),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DigitalSignatureScreen(username: widget.username),
+                        ),
+                      );
+                    },
                   ),
 
                   ListTile(
@@ -811,19 +761,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: const Text('Khen thưởng & Kỷ luật'),
                     onTap: () {},
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.people),
-                    title: const Text('Danh sách nhân viên'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EmployeeListScreen(users: _users),
-                        ),
-                      );
-                    },
-                  ),
+                  
                   ListTile(
                     leading: const Icon(Icons.logout),
                     title: const Text('Đăng xuất'),
@@ -844,28 +782,4 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
     );
   }
-}
-
-Widget _buildDrawerItem(
-  IconData icon,
-  String title, {
-  VoidCallback? onTap,
-  bool dense = false,
-}) {
-  return ListTile(
-    dense: dense,
-    leading: Icon(icon),
-    title: Text(title),
-    onTap: onTap,
-  );
-}
-
-Widget _buildDrawerSectionTitle(String title) {
-  return Padding(
-    padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
-    child: Text(
-      title.toUpperCase(),
-      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-    ),
-  );
 }
