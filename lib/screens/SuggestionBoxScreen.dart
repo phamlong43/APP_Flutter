@@ -5,7 +5,7 @@ class SuggestionBoxScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController _suggestionController = TextEditingController();
+    final TextEditingController suggestionController = TextEditingController();
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +24,7 @@ class SuggestionBoxScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _suggestionController,
+              controller: suggestionController,
               maxLines: 6,
               decoration: InputDecoration(
                 hintText: 'Nhập góp ý tại đây...',
@@ -39,12 +39,12 @@ class SuggestionBoxScreen extends StatelessWidget {
             Center(
               child: ElevatedButton(
                 onPressed: () {
-                  final suggestion = _suggestionController.text;
+                  final suggestion = suggestionController.text;
                   if (suggestion.isNotEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('✅ Cảm ơn bạn đã góp ý!')),
                     );
-                    _suggestionController.clear();
+                    suggestionController.clear();
                   }
                 },
                 style: ElevatedButton.styleFrom(

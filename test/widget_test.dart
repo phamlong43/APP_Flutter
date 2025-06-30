@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/main.dart'; // Đường dẫn đúng đến file main.dart
+import 'package:flutter_testt/main.dart'; // Đường dẫn đúng đến file main.dart
 
 void main() {  testWidgets('Welcome screen test', (WidgetTester tester) async {
     // Build our app and trigger a frame.

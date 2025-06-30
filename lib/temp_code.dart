@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../screens/home_screen.dart';
 
 // File này dùng để lưu trữ phần code tạm thời để fix lỗi
 class TempMainHome {

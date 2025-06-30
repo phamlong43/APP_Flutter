@@ -93,10 +93,15 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   Widget build(BuildContext context) {
     final sorted = [..._tasks];
+    // Sắp xếp: nhiệm vụ chưa hoàn thành lên trước (status khác 'completed', 'hoàn thành', 'failed', 'overdue', 'không hoàn thành')
     sorted.sort((a, b) {
-      final da = DateTime.tryParse(a['dueDate'] ?? '') ?? DateTime(2100);
-      final db = DateTime.tryParse(b['dueDate'] ?? '') ?? DateTime(2100);
-      return da.compareTo(db);
+      final aStatus = (a['status'] ?? '').toLowerCase();
+      final bStatus = (b['status'] ?? '').toLowerCase();
+      bool aDone = aStatus == 'completed' || aStatus == 'hoàn thành' || aStatus == 'failed' || aStatus == 'overdue' || aStatus == 'không hoàn thành';
+      bool bDone = bStatus == 'completed' || bStatus == 'hoàn thành' || bStatus == 'failed' || bStatus == 'overdue' || bStatus == 'không hoàn thành';
+      if (!aDone && bDone) return -1;
+      if (aDone && !bDone) return 1;
+      return 0;
     });
     return Scaffold(
       appBar: AppBar(
@@ -135,108 +140,147 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 statusColor = Colors.grey;
                 statusIcon = Icons.help;
             }
-            return Card(
-              margin: const EdgeInsets.only(bottom: 14),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            return GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text(t['taskName'] ?? ''),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(statusIcon, color: statusColor, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            t['taskName'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            statusLabel,
-                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                        Text('Trạng thái: ${t['status'] ?? ''}'),
+                        if ((t['description'] ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('Mô tả: ${t['description']}'),
+                        ],
+                        if ((t['dueDate'] ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('Hạn: ${t['dueDate']}'),
+                        ],
+                        if ((t['assignedAt'] ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('Cập nhật: ${_formatDateTime(t['assignedAt'])}'),
+                        ],
+                        if ((t['username'] ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text('Người nhận: ${t['username']}'),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.calendar_today, size: 16, color: Colors.blueGrey),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Cập nhật: ' + _formatDateTime(t['assignedAt']),
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(width: 22),
-                        Expanded(
-                          child: Text(
-                            'Hạn: ${t['dueDate'] ?? ''}',
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if ((t['description'] ?? '').isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          t['description'],
-                          style: const TextStyle(fontSize: 14, color: Colors.black87),
-                        ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Đóng'),
                       ),
-                    if ((t['username'] ?? '').isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text('Người nhận: ${t['username']}', style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
-                      ),
-                    // Thêm 2 nút cập nhật trạng thái nếu chưa hoàn thành/thất bại
-                    if ((statusLabel.toLowerCase() != 'completed' && statusLabel.toLowerCase() != 'hoàn thành' && statusLabel.toLowerCase() != 'failed' && statusLabel.toLowerCase() != 'overdue' && statusLabel.toLowerCase() != 'không hoàn thành'))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.check, color: Colors.white),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                onPressed: () => _updateTaskStatus(t['id'], 'completed', t['username']),
-                                label: const Text('Đã hoàn thành'),
-                              ),
+                    ],
+                  ),
+                );
+              },
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 14),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              t['taskName'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                icon: const Icon(Icons.close, color: Colors.white),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                onPressed: () => _updateTaskStatus(t['id'], 'failed', t['username']),
-                                label: const Text('Thất bại'),
-                              ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ],
-                        ),
+                            child: Text(
+                              statusLabel,
+                              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: Colors.blueGrey),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Cập nhật: ' + _formatDateTime(t['assignedAt']),
+                              style: const TextStyle(fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(width: 22),
+                          Expanded(
+                            child: Text(
+                              'Hạn: ${t['dueDate'] ?? ''}',
+                              style: const TextStyle(fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if ((t['description'] ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            t['description'],
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                          ),
+                        ),
+                      if ((t['username'] ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text('Người nhận: ${t['username']}', style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
+                        ),
+                      // Thêm 2 nút cập nhật trạng thái nếu chưa hoàn thành/thất bại
+                      if ((statusLabel.toLowerCase() != 'completed' && statusLabel.toLowerCase() != 'hoàn thành' && statusLabel.toLowerCase() != 'failed' && statusLabel.toLowerCase() != 'overdue' && statusLabel.toLowerCase() != 'không hoàn thành'))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.check, color: Colors.white),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                  onPressed: () => _updateTaskStatus(t['id'], 'completed', t['username']),
+                                  label: const Text('Đã hoàn thành'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  onPressed: () => _updateTaskStatus(t['id'], 'failed', t['username']),
+                                  label: const Text('Thất bại'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
