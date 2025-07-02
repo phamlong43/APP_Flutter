@@ -12,15 +12,17 @@ import 'employee_list_screen.dart';
 import 'welcome_screen.dart';
 import 'Work_Schedule_Screen.dart';
 import 'change_password_screen.dart' as real_change_password;
-import 'placeholder_screens.dart'
-    hide
-        WorkScreen,
-        InternalCommunicationScreen,
-        PersonalInformationScreen,
-        EmployeeListScreen,
-        WorkScheduleScreen,
-        NotificationScreen,
-        LichSuChamCongScreen;
+import 'SalaryDetailScreen.dart';
+import 'LeaveRequestScreen.dart';
+import 'SuggestionBoxScreen.dart';
+import 'DocumentScreen.dart';
+import 'AdvanceRequestScreen.dart';
+import 'CongTacScreen.dart';
+import 'ChamCongHoScreen.dart';
+import 'ChatScreen.dart';
+import 'RewardDisciplineScreen.dart';
+import 'EmployeeScreen.dart';
+import 'RecruitmentScreen.dart';
 import 'notification_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -33,6 +35,7 @@ import 'components/admin_recent_activity_card.dart';
 import 'admin_statistics_screen.dart';
 import 'digital_signature_screen.dart';
 import 'LichSuChamCongScreen.dart';
+import 'AttendanceCalendarScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isAdmin;
@@ -72,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _fetchTasks();
     }
     _checkTodayAttendanceStatus(); // Kiểm tra trạng thái chấm công hôm nay
+    _checkCurrentAttendanceStatus(); // Kiểm tra trạng thái chấm công hiện tại
   }
 
   // Function để kiểm tra trạng thái chấm công hôm nay
@@ -135,6 +139,100 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('DEBUG: Error checking attendance status: $e');
+    }
+  }
+
+  // Function để kiểm tra trạng thái chấm công hiện tại từ API
+  Future<void> _checkCurrentAttendanceStatus() async {
+    try {
+      final now = DateTime.now();
+      final workingDate = now.toIso8601String().substring(0, 10); // YYYY-MM-DD
+      
+      print('DEBUG: Checking current attendance status for date: $workingDate');
+
+      // Danh sách endpoints để thử
+      final endpointsToTry = [
+        'http://localhost:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
+        'http://10.0.2.2:8080/attendance',
+        'http://localhost:8080/attendance',
+        'http://127.0.0.1:8080/api/attendance',
+      ];
+
+      // Thử từng endpoint để lấy dữ liệu
+      for (String endpoint in endpointsToTry) {
+        try {
+          String getUrl = '$endpoint?userId=${widget.userId}&date=$workingDate';
+          final response = await http.get(
+            Uri.parse(getUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          ).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            print('DEBUG: Current attendance data: ${jsonEncode(data)}');
+            
+            if (data is List && data.isNotEmpty) {
+              // Tìm record hôm nay có checkOut = null (đang trong ca)
+              final todayRecords = data.where(
+                (record) => record['workingDate'] == workingDate
+              ).toList();
+              
+              print('DEBUG: Today records count: ${todayRecords.length}');
+              
+              final activeRecord = todayRecords.firstWhere(
+                (record) => record['checkOut'] == null || record['checkOut'].toString().isEmpty,
+                orElse: () => null,
+              );
+              
+              if (activeRecord != null) {
+                // Có record đang trong ca (chưa check-out)
+                print('DEBUG: Found active record: ${jsonEncode(activeRecord)}');
+                setState(() {
+                  _isCheckedIn = true;
+                  if (activeRecord['checkIn'] != null) {
+                    _checkInTime = DateTime.parse(activeRecord['checkIn']);
+                  }
+                });
+              } else {
+                // Không có record đang trong ca
+                print('DEBUG: No active record found');
+                setState(() {
+                  _isCheckedIn = false;
+                  _checkInTime = null;
+                });
+              }
+              
+              // Hiển thị thông tin về số lần chấm công hôm nay
+              if (todayRecords.length > 1) {
+                print('DEBUG: Multiple attendance records today: ${todayRecords.length}');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('ℹ️ Hôm nay bạn đã có ${todayRecords.length} lần chấm công'),
+                    backgroundColor: Colors.orange,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            } else {
+              // Không có dữ liệu chấm công hôm nay
+              setState(() {
+                _isCheckedIn = false;
+                _checkInTime = null;
+              });
+            }
+            break; // Thoát khỏi loop khi thành công
+          }
+        } catch (e) {
+          print('DEBUG: Failed to check attendance status with endpoint $endpoint: $e');
+          continue;
+        }
+      }
+    } catch (e) {
+      print('DEBUG: General error checking attendance status: $e');
     }
   }
 
@@ -221,20 +319,51 @@ class _HomeScreenState extends State<HomeScreen> {
           print('DEBUG: Check-in response body: ${response.body}');
 
           if (response.statusCode == 200 || response.statusCode == 201) {
-            // Thành công
-            success = true;
-            setState(() {
-              _isCheckedIn = true;
-              _checkInTime = now;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('✅ Vào ca thành công lúc ${_formatTime(now)}!'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            break; // Thoát khỏi loop khi thành công
+            // Verify rằng check-in đã được tạo thành công
+            print('DEBUG: Verifying check-in creation...');
+            
+            try {
+              final responseData = jsonDecode(response.body);
+              print('DEBUG: Check-in response data: ${jsonEncode(responseData)}');
+              
+              // Kiểm tra xem record đã có ID và checkIn time chưa
+              if (responseData['id'] != null && responseData['checkIn'] != null) {
+                print('DEBUG: Check-in verified successfully with ID: ${responseData['id']}');
+                success = true;
+                setState(() {
+                  _isCheckedIn = true;
+                  _checkInTime = now;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✅ Vào ca thành công lúc ${_formatTime(now)}!'),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+                break; // Thoát khỏi loop khi thành công
+              } else {
+                lastError = 'Check-in response thiếu ID hoặc checkIn time';
+                print('DEBUG: Check-in verification failed - missing ID or checkIn');
+                continue;
+              }
+            } catch (parseError) {
+              // Nếu không parse được response nhưng status code OK
+              print('DEBUG: Cannot parse response but status OK, assuming success: $parseError');
+              success = true;
+              setState(() {
+                _isCheckedIn = true;
+                _checkInTime = now;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('✅ Vào ca thành công lúc ${_formatTime(now)}!'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              break;
+            }
           } else {
             lastError = 'Status ${response.statusCode}: ${response.body}';
             continue; // Thử endpoint tiếp theo
@@ -318,9 +447,10 @@ class _HomeScreenState extends State<HomeScreen> {
             final data = jsonDecode(getResponse.body);
             
             if (data is List && data.isNotEmpty) {
-              // Tìm record hôm nay
+              // Tìm record hôm nay có checkOut = null (đang trong ca)
               final todayRecord = data.firstWhere(
-                (record) => record['workingDate'] == workingDate,
+                (record) => record['workingDate'] == workingDate && 
+                           (record['checkOut'] == null || record['checkOut'].toString().isEmpty),
                 orElse: () => null,
               );
               
@@ -346,19 +476,48 @@ class _HomeScreenState extends State<HomeScreen> {
                 print('DEBUG: Check-out PUT response body: ${putResponse.body}');
 
                 if (putResponse.statusCode == 200 || putResponse.statusCode == 204) {
-                  success = true;
-                  setState(() {
-                    _isCheckedIn = false;
-                    _checkInTime = null;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ Kết thúc ca thành công lúc ${_formatTime(now)}!\nTổng giờ làm: ${workingHours.toStringAsFixed(2)} giờ'),
-                      backgroundColor: Colors.blue,
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
-                  break;
+                  // Verify rằng checkout đã được update thành công
+                  print('DEBUG: Verifying checkout update...');
+                  
+                  // Bước 3: Kiểm tra lại record để confirm checkout đã được update
+                  final verifyResponse = await http.get(
+                    Uri.parse('$endpoint/${todayRecord['id']}'),
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                    },
+                  ).timeout(const Duration(seconds: 10));
+
+                  if (verifyResponse.statusCode == 200) {
+                    final verifyData = jsonDecode(verifyResponse.body);
+                    print('DEBUG: Verify data: ${jsonEncode(verifyData)}');
+                    
+                    // Kiểm tra xem checkOut đã được update thành công chưa
+                    if (verifyData['checkOut'] != null && verifyData['checkOut'].toString().isNotEmpty) {
+                      print('DEBUG: Checkout verified successfully: ${verifyData['checkOut']}');
+                      success = true;
+                      setState(() {
+                        _isCheckedIn = false;
+                        _checkInTime = null;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('✅ Kết thúc ca thành công lúc ${_formatTime(now)}!\nTổng giờ làm: ${workingHours.toStringAsFixed(2)} giờ'),
+                          backgroundColor: Colors.blue,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                      break;
+                    } else {
+                      lastError = 'Checkout chưa được update trong database';
+                      print('DEBUG: Checkout verification failed - checkOut field is empty');
+                      continue;
+                    }
+                  } else {
+                    lastError = 'Không thể verify checkout - Verify Status ${verifyResponse.statusCode}';
+                    print('DEBUG: Verify request failed: ${verifyResponse.statusCode}');
+                    continue;
+                  }
                 } else {
                   lastError = 'PUT Status ${putResponse.statusCode}: ${putResponse.body}';
                   continue;
@@ -454,7 +613,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ChatScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          userId: widget.userId,
+                          isAdmin: widget.isAdmin,
+                          username: widget.username,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -1240,7 +1405,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AttendanceCalendarScreen(),
+                          builder: (_) => AttendanceCalendarScreen(userId: widget.userId),
                         ),
                       );
                     },
@@ -1258,7 +1423,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const SalaryDetailScreen(),
+                          builder: (_) => SalaryDetailScreen(userId: int.tryParse(widget.userId) ?? 2),
                         ),
                       );
                     },
@@ -1266,7 +1431,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   ListTile(
                     leading: const Icon(Icons.star_outline),
                     title: const Text('Khen thưởng & Kỷ luật'),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RewardDisciplineScreen(
+                            isAdmin: widget.isAdmin,
+                            userId: widget.userId,
+                            username: widget.username,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.people),
