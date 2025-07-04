@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/welcome_screen.dart';
 import 'services/user_api.dart';
 
@@ -45,6 +46,17 @@ class HRManagementApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
+      // Hỗ trợ đa ngôn ngữ
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'), // English
+        Locale('vi'), // Vietnamese
+      ],
+      locale: const Locale('vi'), // Mặc định là tiếng Việt
       // Khởi đầu là WelcomeScreen
       home: const WelcomeScreen(),
     );

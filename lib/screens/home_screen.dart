@@ -455,9 +455,9 @@ class _HomeScreenState extends State<HomeScreen> {
               );
               
               if (todayRecord != null && todayRecord['id'] != null) {
-                // Bước 2: Cập nhật record với checkOut (chỉ gửi checkOut theo yêu cầu)
+                // Bước 2: Cập nhật record với status = out (thay vì gửi checkOut)
                 final updateData = {
-                  "checkOut": checkOutTime
+                  "status": "out"
                 };
 
                 print('DEBUG: Update data: ${jsonEncode(updateData)}');
@@ -685,7 +685,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => LichSuChamCongScreen(userId: widget.userId),
+                        builder: (_) => LichSuChamCongScreen(
+                          userId: widget.userId,
+                          role: widget.isAdmin ? 'ADMIN' : 'USER',
+                        ),
                       ),
                     );
                   },
@@ -1129,7 +1132,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => LichSuChamCongScreen(userId: widget.userId),
+                      builder: (_) => LichSuChamCongScreen(
+                        userId: widget.userId,
+                        role: widget.isAdmin ? 'ADMIN' : 'USER',
+                      ),
                     ),
                   );
                 },

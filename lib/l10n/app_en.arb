@@ -1,0 +1,14 @@
+{
+    "@@locale": "en",
+    "appTitle": "HR Management",
+    "welcome": "Welcome",
+    "login": "Login",
+    "username": "Username",
+    "password": "Password",
+    "loginSuccess": "Login successful",
+    "loginFailure": "Login failed",
+    "adminAccount": "Admin account",
+    "adminAccountCreated": "Admin account has been created successfully",
+    "adminAccountExists": "Admin account already exists",
+    "errorCheckingAdmin": "Error checking or creating admin account: {error}"
+}

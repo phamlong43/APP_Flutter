@@ -1,0 +1,14 @@
+{
+    "@@locale": "vi",
+    "appTitle": "Quản lý nhân sự",
+    "welcome": "Chào mừng",
+    "login": "Đăng nhập",
+    "username": "Tên đăng nhập",
+    "password": "Mật khẩu",
+    "loginSuccess": "Đăng nhập thành công",
+    "loginFailure": "Đăng nhập thất bại",
+    "adminAccount": "Tài khoản admin",
+    "adminAccountCreated": "Tài khoản admin đã được tạo thành công",
+    "adminAccountExists": "Tài khoản admin đã tồn tại",
+    "errorCheckingAdmin": "Lỗi khi kiểm tra hoặc tạo tài khoản admin: {error}"
+}

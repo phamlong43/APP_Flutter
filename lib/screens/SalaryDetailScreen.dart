@@ -19,7 +19,7 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
   List<dynamic> _attendanceData = [];
   double _totalWorkingHours = 0;
   double _hourlyWage = 0;
-  final double _hourlyRate = 25000; // 25,000 VND per hour
+  double _hourlyRate = 25000; // Default value, will be replaced with API data if available
   String _currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
   String _displayMonth = DateFormat('MM/yyyy').format(DateTime.now());
   String _errorMessage = '';
@@ -208,6 +208,23 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
             setState(() {
               _salaryData = salaryData;
               
+              // Extract hourly rate from API data if available
+              if (salaryData.containsKey('hourlyRate') && salaryData['hourlyRate'] != null) {
+                try {
+                  if (salaryData['hourlyRate'] is int) {
+                    _hourlyRate = salaryData['hourlyRate'].toDouble();
+                  } else if (salaryData['hourlyRate'] is double) {
+                    _hourlyRate = salaryData['hourlyRate'];
+                  } else {
+                    _hourlyRate = double.parse(salaryData['hourlyRate'].toString());
+                  }
+                  print('Hourly rate loaded from API: $_hourlyRate');
+                } catch (e) {
+                  print('Error parsing hourly rate: $e');
+                  // Keep default value if parsing fails
+                }
+              }
+              
               // Update the display month if available in data
               if (salaryData.containsKey('monthYear') && salaryData['monthYear'] != null) {
                 final monthYear = salaryData['monthYear'].toString();
@@ -277,6 +294,7 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
     });
     
     print('Total working hours: $_totalWorkingHours');
+    print('Hourly rate: $_hourlyRate VND/hour');
     print('Hourly wage calculated: $_hourlyWage VND');
   }
 
@@ -520,8 +538,8 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
                           
                           _buildSectionTitle('Lương theo giờ làm việc'),
                           _buildRow('Tổng số giờ làm việc', '$_totalWorkingHours giờ'),
-                          _buildRow('Đơn giá mỗi giờ', _formatCurrency(_hourlyRate)),
-                          _buildRow('Lương theo giờ', _formatCurrency(_hourlyWage)),
+                          _buildRow('Đơn giá mỗi giờ', _formatCurrency(_hourlyRate) + ' VND'),
+                          _buildRow('Lương theo giờ', _formatCurrency(_hourlyWage) + ' VND'),
                           
                           const SizedBox(height: 16),
                           _buildSectionTitle('Tổng kết'),

@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 
 class LichSuChamCongScreen extends StatefulWidget {
   final String? userId;
+  final String? role; // Role của người dùng (ADMIN, USER, ...)
   
-  const LichSuChamCongScreen({super.key, this.userId});
+  const LichSuChamCongScreen({super.key, this.userId, this.role});
 
   @override
   State<LichSuChamCongScreen> createState() => _LichSuChamCongScreenState();
@@ -61,10 +62,17 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
             setState(() {
               if (data is List) {
                 attendanceLogs = List<Map<String, dynamic>>.from(data);
+                // Cập nhật sample data nếu không có username (cho trường hợp không có API)
+                for (var log in attendanceLogs) {
+                  if (log['user'] == null) {
+                    log['user'] = {'username': 'user${log['id'] ?? ''}'}; 
+                  }
+                }
               } else if (data is Map && data['attendance'] is List) {
                 attendanceLogs = List<Map<String, dynamic>>.from(data['attendance']);
               }
               success = true;
+              print('DEBUG: Fetched ${attendanceLogs.length} records with user data structure: ${attendanceLogs.isNotEmpty ? attendanceLogs[0].containsKey('user') : 'empty'}');
             });
             break;
           }
@@ -79,6 +87,12 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
         setState(() {
           attendanceLogs = [
             {
+              'id': 1,
+              'user': {
+                'id': 2,
+                'username': 'user1',
+                'role': 'USER'
+              },
               'workingDate': '2025-06-30',
               'checkIn': '2025-06-30T08:00:00',
               'checkOut': '2025-06-30T17:00:00',
@@ -87,6 +101,12 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
               'status': 'completed'
             },
             {
+              'id': 2,
+              'user': {
+                'id': 3,
+                'username': 'user2',
+                'role': 'USER'
+              },
               'workingDate': '2025-06-29',
               'checkIn': '2025-06-29T08:15:00',
               'checkOut': '2025-06-29T17:10:00',
@@ -95,6 +115,12 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
               'status': 'completed'
             },
             {
+              'id': 3,
+              'user': {
+                'id': 2,
+                'username': 'user1',
+                'role': 'USER'
+              },
               'workingDate': '2025-06-28',
               'checkIn': '2025-06-28T08:05:00',
               'checkOut': '2025-06-28T17:05:00',
@@ -103,6 +129,12 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
               'status': 'completed'
             },
             {
+              'id': 4,
+              'user': {
+                'id': 4,
+                'username': 'user3',
+                'role': 'USER'
+              },
               'workingDate': '2025-06-27',
               'checkIn': '2025-06-27T08:20:00',
               'checkOut': null,
@@ -119,6 +151,12 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
       setState(() {
         attendanceLogs = [
           {
+            'id': 1,
+            'user': {
+              'id': 1,
+              'username': 'fallback_user',
+              'role': 'USER'
+            },
             'workingDate': '2025-06-30',
             'checkIn': '2025-06-30T08:00:00',
             'checkOut': '2025-06-30T17:00:00',
@@ -304,6 +342,17 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+                              
+                              // Username (người chấm công) - Chỉ hiển thị cho admin
+                              if (widget.role?.toUpperCase() == 'ADMIN') ...[
+                                _buildInfoRow(
+                                  icon: Icons.person,
+                                  iconColor: Colors.purple,
+                                  label: 'Người dùng:',
+                                  value: log['user'] != null ? log['user']['username'] ?? 'Không có thông tin' : 'Không có thông tin',
+                                ),
+                                const SizedBox(height: 8),
+                              ],
                               
                               // Thời gian vào
                               _buildInfoRow(
