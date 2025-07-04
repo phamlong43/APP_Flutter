@@ -403,9 +403,9 @@ class EmployeeDetailScreen extends StatelessWidget {
 
       // Danh sách endpoints để thử kết nối
       final endpointsToTry = [
-        'http://localhost:8080/api/salaries/${employee.id}',
         'http://10.0.2.2:8080/api/salaries/${employee.id}',
-        'http://127.0.0.1:8080/api/salaries/${employee.id}',
+        'http://10.0.2.2:8080/api/salaries/${employee.id}',
+        'http://10.0.2.2:8080/api/salaries/${employee.id}',
       ];
       
       // Parse các giá trị số

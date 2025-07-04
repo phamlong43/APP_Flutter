@@ -80,11 +80,11 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
   // Function to fetch user data
   Future<void> _fetchUserData() async {
     try {
-      // List of endpoints to try
+      // List of endpoints to try (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
-        'http://localhost:8080/users/id/${widget.userId}',
         'http://10.0.2.2:8080/users/id/${widget.userId}',
-        'http://127.0.0.1:8080/users/id/${widget.userId}',
+        'http://10.0.2.2:8080/users/id/${widget.userId}',
+        'http://10.0.2.2:8080/users/id/${widget.userId}',
       ];
 
       for (String endpoint in endpointsToTry) {
@@ -124,11 +124,11 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
       final year = yearMonth[0];
       final month = yearMonth[1];
       
-      // List of endpoints to try
+      // List of endpoints to try (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
-        'http://localhost:8080/api/attendance/user/${widget.userId}',
         'http://10.0.2.2:8080/api/attendance/user/${widget.userId}',
-        'http://127.0.0.1:8080/api/attendance/user/${widget.userId}',
+        'http://10.0.2.2:8080/api/attendance/user/${widget.userId}',
+        'http://10.0.2.2:8080/api/attendance/user/${widget.userId}',
       ];
 
       for (String endpoint in endpointsToTry) {
@@ -174,15 +174,15 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
   // Function to fetch salary data
   Future<void> _fetchSalaryData() async {
     try {
-      // List of endpoints to try
+      // List of endpoints to try (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
-        'http://localhost:8080/api/salaries/${widget.userId}?month=$_currentMonth',
         'http://10.0.2.2:8080/api/salaries/${widget.userId}?month=$_currentMonth',
-        'http://127.0.0.1:8080/api/salaries/${widget.userId}?month=$_currentMonth',
+        'http://10.0.2.2:8080/api/salaries/${widget.userId}?month=$_currentMonth',
+        'http://10.0.2.2:8080/api/salaries/${widget.userId}?month=$_currentMonth',
         // Try without month parameter as fallback
-        'http://localhost:8080/api/salaries/${widget.userId}',
         'http://10.0.2.2:8080/api/salaries/${widget.userId}',
-        'http://127.0.0.1:8080/api/salaries/${widget.userId}',
+        'http://10.0.2.2:8080/api/salaries/${widget.userId}',
+        'http://10.0.2.2:8080/api/salaries/${widget.userId}',
       ];
 
       bool dataLoaded = false;
@@ -301,26 +301,63 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
   // Calculate the total income safely
   String _calculateTotalIncome() {
     try {
-      double totalSalary = 0;
-      if (_salaryData.containsKey('totalSalary') && _salaryData['totalSalary'] != null) {
-        if (_salaryData['totalSalary'] is int) {
-          totalSalary = _salaryData['totalSalary'].toDouble();
-        } else if (_salaryData['totalSalary'] is double) {
-          totalSalary = _salaryData['totalSalary'];
-        } else {
-          try {
-            totalSalary = double.parse(_salaryData['totalSalary'].toString());
-          } catch (e) {
-            print('Error parsing totalSalary: $e');
-          }
-        }
+      // Lấy lương cơ bản
+      double basicSalary = 0;
+      if (_salaryData.containsKey('basicSalary') && _salaryData['basicSalary'] != null) {
+        basicSalary = _parseNumericValue(_salaryData['basicSalary']);
       }
       
-      final totalIncome = totalSalary + _hourlyWage;
+      // Lấy tiền thưởng
+      double bonus = 0;
+      if (_salaryData.containsKey('bonus') && _salaryData['bonus'] != null) {
+        bonus = _parseNumericValue(_salaryData['bonus']);
+      }
+      
+      // Lấy phụ cấp
+      double allowance = 0;
+      if (_salaryData.containsKey('allowance') && _salaryData['allowance'] != null) {
+        allowance = _parseNumericValue(_salaryData['allowance']);
+      }
+      
+      // Lấy khấu trừ
+      double deduction = 0;
+      if (_salaryData.containsKey('deduction') && _salaryData['deduction'] != null) {
+        deduction = _parseNumericValue(_salaryData['deduction']);
+      }
+      
+      // Tính tổng thu nhập theo công thức: lương cơ bản + lương theo giờ + thưởng + phụ cấp - khấu trừ
+      final totalIncome = basicSalary + _hourlyWage + bonus + allowance - deduction;
+      
+      print('DEBUG: Tính tổng thu nhập:');
+      print('- Lương cơ bản: $basicSalary');
+      print('- Lương theo giờ: $_hourlyWage');
+      print('- Thưởng: $bonus');
+      print('- Phụ cấp: $allowance');
+      print('- Khấu trừ: $deduction');
+      print('= Tổng thu nhập: $totalIncome');
+      
       return _formatCurrency(totalIncome);
     } catch (e) {
       print('Error calculating total income: $e');
       return _formatCurrency(_hourlyWage); // Fallback to only hourly wage if error
+    }
+  }
+  
+  // Hàm trợ giúp để chuyển đổi giá trị sang double
+  double _parseNumericValue(dynamic value) {
+    if (value == null) return 0;
+    
+    if (value is int) {
+      return value.toDouble();
+    } else if (value is double) {
+      return value;
+    } else {
+      try {
+        return double.parse(value.toString());
+      } catch (e) {
+        print('Error parsing value: $e');
+        return 0;
+      }
     }
   }
 
@@ -495,6 +532,14 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
                                       color: Colors.green,
                                     ),
                                   ),
+                                  Text(
+                                    '(Lương cơ bản + Lương theo giờ + Thưởng + Phụ cấp - Khấu trừ)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Tổng giờ làm việc: $_totalWorkingHours giờ',
@@ -502,7 +547,7 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Số ngày làm việc: ${_attendanceData.length}',
+                                    'Số ca làm việc: ${_attendanceData.length}',
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                 ],
@@ -543,7 +588,7 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
                           
                           const SizedBox(height: 16),
                           _buildSectionTitle('Tổng kết'),
-                          _buildRow('Tổng lương', _calculateTotalIncome()),
+                          _buildRow('Tổng thu nhập', _calculateTotalIncome() + ' VND'),
                           _buildRow('Trạng thái', _formatStatus(_salaryData['status'])),
                         ],
                       ),

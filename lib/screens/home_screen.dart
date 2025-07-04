@@ -83,13 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
       
-      // Danh sách endpoints để thử
+      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
         'http://10.0.2.2:8080/api/attendance',
         'http://10.0.2.2:8080/attendance',
-        'http://localhost:8080/api/attendance',
-        'http://localhost:8080/attendance',
-        'http://127.0.0.1:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
+        'http://10.0.2.2:8080/attendance',
+        'http://10.0.2.2:8080/api/attendance',
       ];
 
       for (String endpoint in endpointsToTry) {
@@ -150,13 +150,13 @@ class _HomeScreenState extends State<HomeScreen> {
       
       print('DEBUG: Checking current attendance status for date: $workingDate');
 
-      // Danh sách endpoints để thử
+      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
-        'http://localhost:8080/api/attendance',
         'http://10.0.2.2:8080/api/attendance',
         'http://10.0.2.2:8080/attendance',
-        'http://localhost:8080/attendance',
-        'http://127.0.0.1:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
+        'http://10.0.2.2:8080/attendance',
+        'http://10.0.2.2:8080/api/attendance',
       ];
 
       // Thử từng endpoint để lấy dữ liệu
@@ -289,13 +289,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
       print('DEBUG: Check-in data: ${jsonEncode(checkInData)}');
 
-      // Danh sách endpoints để thử
+      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
         'http://10.0.2.2:8080/api/attendance',
         'http://10.0.2.2:8080/attendance',
-        'http://localhost:8080/api/attendance',
-        'http://localhost:8080/attendance',
-        'http://127.0.0.1:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
+        'http://10.0.2.2:8080/attendance',
+        'http://10.0.2.2:8080/api/attendance',
       ];
 
       bool success = false;
@@ -416,13 +416,12 @@ class _HomeScreenState extends State<HomeScreen> {
       print('DEBUG: Check-out started for date: $workingDate, time: $checkOutTime');
       print('DEBUG: Working hours calculated: $workingHours');
 
-      // Danh sách endpoints để thử (ưu tiên localhost:8080 theo yêu cầu)
+      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
       final endpointsToTry = [
-        'http://localhost:8080/api/attendance',
         'http://10.0.2.2:8080/api/attendance',
         'http://10.0.2.2:8080/attendance',
-        'http://localhost:8080/attendance',
-        'http://127.0.0.1:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
+        'http://10.0.2.2:8080/api/attendance',
       ];
 
       bool success = false;
@@ -492,9 +491,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     final verifyData = jsonDecode(verifyResponse.body);
                     print('DEBUG: Verify data: ${jsonEncode(verifyData)}');
                     
-                    // Kiểm tra xem checkOut đã được update thành công chưa
-                    if (verifyData['checkOut'] != null && verifyData['checkOut'].toString().isNotEmpty) {
-                      print('DEBUG: Checkout verified successfully: ${verifyData['checkOut']}');
+                    // Kiểm tra xem status đã đổi thành "out" hoặc checkOut đã được update thành công chưa
+                    if ((verifyData['status'] != null && verifyData['status'] == "out") || 
+                        (verifyData['checkOut'] != null && verifyData['checkOut'].toString().isNotEmpty)) {
+                      print('DEBUG: Checkout verified successfully - Status: ${verifyData['status']}, CheckOut: ${verifyData['checkOut']}');
                       success = true;
                       setState(() {
                         _isCheckedIn = false;
@@ -509,8 +509,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                       break;
                     } else {
-                      lastError = 'Checkout chưa được update trong database';
-                      print('DEBUG: Checkout verification failed - checkOut field is empty');
+                      lastError = 'Checkout chưa được update trong database (status hoặc checkOut chưa được cập nhật)';
+                      print('DEBUG: Checkout verification failed - Status: ${verifyData['status']}, CheckOut field: ${verifyData['checkOut']}');
                       continue;
                     }
                   } else {
