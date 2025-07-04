@@ -284,7 +284,7 @@ class EmployeeDetailScreen extends StatelessWidget {
               TextField(
                 controller: hourlyRateController,
                 decoration: const InputDecoration(
-                  labelText: 'Lương mỗi giờ',
+                  labelText: 'Lương theo giờ',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.access_time),
                   hintText: 'VND/giờ',
@@ -403,9 +403,9 @@ class EmployeeDetailScreen extends StatelessWidget {
 
       // Danh sách endpoints để thử kết nối
       final endpointsToTry = [
+        'http://localhost:8080/api/salaries/${employee.id}',
         'http://10.0.2.2:8080/api/salaries/${employee.id}',
-        'http://10.0.2.2:8080/api/salaries/${employee.id}',
-        'http://10.0.2.2:8080/api/salaries/${employee.id}',
+        'http://127.0.0.1:8080/api/salaries/${employee.id}',
       ];
       
       // Parse các giá trị số
@@ -417,15 +417,14 @@ class EmployeeDetailScreen extends StatelessWidget {
       final hourlyRateValue = int.tryParse(hourlyRate) ?? 0;
       
       final Map<String, dynamic> requestBody = {
-        "user": {"id": employee.id},
-        "monthYear": monthYear,
         "basicSalary": basicSalaryValue,
         "allowance": allowanceValue,
         "bonus": bonusValue,
         "deduction": deductionValue,
         "overtimeSalary": overtimeSalaryValue,
-        "status": status,
-        "hourly_rate": hourlyRateValue
+        "hourlyRate": hourlyRateValue,
+        "monthYear": monthYear,
+        "status": status
       };
       
       print('DEBUG: Updating salary for employee: ${employee.fullName}, ID: ${employee.id}');

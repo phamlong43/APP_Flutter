@@ -324,15 +324,22 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
       if (_salaryData.containsKey('deduction') && _salaryData['deduction'] != null) {
         deduction = _parseNumericValue(_salaryData['deduction']);
       }
+
+      // Lấy lương tăng ca
+      double overtimeSalary = 0;
+      if (_salaryData.containsKey('overtimeSalary') && _salaryData['overtimeSalary'] != null) {
+        overtimeSalary = _parseNumericValue(_salaryData['overtimeSalary']);
+      }
       
-      // Tính tổng thu nhập theo công thức: lương cơ bản + lương theo giờ + thưởng + phụ cấp - khấu trừ
-      final totalIncome = basicSalary + _hourlyWage + bonus + allowance - deduction;
+      // Tính tổng thu nhập theo công thức: lương cơ bản + lương theo giờ + thưởng + phụ cấp + lương tăng ca - khấu trừ
+      final totalIncome = basicSalary + _hourlyWage + bonus + allowance + overtimeSalary - deduction;
       
       print('DEBUG: Tính tổng thu nhập:');
       print('- Lương cơ bản: $basicSalary');
       print('- Lương theo giờ: $_hourlyWage');
       print('- Thưởng: $bonus');
       print('- Phụ cấp: $allowance');
+      print('- Lương tăng ca: $overtimeSalary');
       print('- Khấu trừ: $deduction');
       print('= Tổng thu nhập: $totalIncome');
       
@@ -533,7 +540,7 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '(Lương cơ bản + Lương theo giờ + Thưởng + Phụ cấp - Khấu trừ)',
+                                    '(Lương cơ bản + Lương theo giờ + Thưởng + Phụ cấp + Lương tăng ca - Khấu trừ)',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey[600],
