@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../config/api_config.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String username;
@@ -19,7 +20,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; });
-    final url = Uri.parse('http://10.0.2.2:8080/users/change-password');
+    final url = Uri.parse('${ApiConfig.userEndpoint}/change-password');
     final body = jsonEncode({
       'username': widget.username,
       'oldPassword': _oldPasswordController.text.trim(),

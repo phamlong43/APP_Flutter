@@ -63,7 +63,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
               const Center(
                 child: Text(
-                  'Powered by Flutter ✨',
+                  '',
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               )

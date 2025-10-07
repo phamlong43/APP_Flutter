@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import '../services/api_endpoints.dart';
+import '../config/api_config.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -47,8 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _login() async {
     try {
       final endpointsToTry = [
-        'http://localhost:8080/api/auth/login',
-        'http://10.0.2.2:8080/api/auth/login',
+        '${ApiConfig.authEndpoint}/login',
+        ApiEndpoints.chatAuthUrl,
       ];
       
       for (String endpoint in endpointsToTry) {
@@ -107,8 +109,8 @@ class _ChatScreenState extends State<ChatScreen> {
     
     try {
       final endpointsToTry = [
-        'http://localhost:8080/api/chat/conversations/${widget.userId}',
-        'http://10.0.2.2:8080/api/chat/conversations/${widget.userId}',
+        '${ApiConfig.chatEndpoint}/conversations/${widget.userId}',
+        ApiEndpoints.getChatConversationsUrl(widget.userId),
       ];
       
       bool success = false;
@@ -213,8 +215,8 @@ class _ChatScreenState extends State<ChatScreen> {
     
     try {
       final endpointsToTry = [
-        'http://localhost:8080/api/users?search=$query',
-        'http://10.0.2.2:8080/api/users?search=$query',
+        '${ApiConfig.userEndpoint}?search=$query',
+        ApiEndpoints.getSearchUsersUrl(query),
       ];
       
       for (String endpoint in endpointsToTry) {
@@ -374,8 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       // Gửi một tin nhắn ban đầu để tạo cuộc trò chuyện
       final endpointsToTry = [
-        'http://localhost:8080/api/chat/send',
-        'http://10.0.2.2:8080/api/chat/send',
+        ApiEndpoints.chatSendUrl,
       ];
       
       for (String endpoint in endpointsToTry) {
@@ -588,8 +589,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final otherUser = widget.conversationId;
       
       final endpointsToTry = [
-        'http://localhost:8080/api/chat/history?user1=${widget.userId}&user2=$otherUser',
-        'http://10.0.2.2:8080/api/chat/history?user1=${widget.userId}&user2=$otherUser',
+        '${ApiConfig.chatEndpoint}/history?user1=${widget.userId}&user2=$otherUser',
+        ApiEndpoints.getChatHistoryUrl(widget.userId, otherUser),
       ];
       
       bool success = false;
@@ -702,8 +703,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final otherUser = widget.conversationId;
       
       final endpointsToTry = [
-        'http://localhost:8080/api/chat/send',
-        'http://10.0.2.2:8080/api/chat/send',
+        ApiEndpoints.chatSendUrl,
       ];
       
       bool success = false;

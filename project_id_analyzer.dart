@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'lib/services/api_endpoints.dart';
 
 void main() async {
   print('🔍 PROJECT ID STRUCTURE ANALYZER 🔍\n');
@@ -7,7 +8,7 @@ void main() async {
   final urls = [
     'http://localhost:8080',
     'http://127.0.0.1:8080',
-    'http://10.0.2.2:8080',
+    ApiEndpoints.baseUrl,
   ];
   
   for (String baseUrl in urls) {

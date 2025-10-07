@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../services/api_endpoints.dart';
 
 class LichSuChamCongScreen extends StatefulWidget {
   final String? userId;
@@ -28,8 +29,8 @@ class _LichSuChamCongScreenState extends State<LichSuChamCongScreen> {
     try {
       // Danh sách endpoints để thử
       final endpointsToTry = [
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
+        ApiEndpoints.attendanceUrl,
+        ApiEndpoints.attendanceAltUrl,
         'http://localhost:8080/api/attendance',
         'http://localhost:8080/attendance',
         'http://127.0.0.1:8080/api/attendance',

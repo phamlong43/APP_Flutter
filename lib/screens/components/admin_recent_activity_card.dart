@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import '../../services/api_endpoints.dart';
 
 class AdminRecentActivityCard extends StatefulWidget {
   const AdminRecentActivityCard({super.key});
@@ -34,8 +35,8 @@ class _AdminRecentActivityCardState extends State<AdminRecentActivityCard> {
     _loading = true;
     try {
       final responses = await Future.wait([
-        http.get(Uri.parse('http://10.0.2.2:8080/tasks/all')).timeout(const Duration(seconds: 10)),
-        http.get(Uri.parse('http://10.0.2.2:8080/requests/all')).timeout(const Duration(seconds: 10)),
+        http.get(Uri.parse(ApiEndpoints.allTasksUrl)).timeout(const Duration(seconds: 10)),
+        http.get(Uri.parse(ApiEndpoints.allRequestsUrl)).timeout(const Duration(seconds: 10)),
       ]);
       List<Map<String, dynamic>> newActivities = [];
       // Tasks

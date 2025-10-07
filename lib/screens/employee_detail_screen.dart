@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../config/api_config.dart';
 
 class EmployeeDetailScreen extends StatelessWidget {
   final Employee employee;
@@ -401,12 +402,8 @@ class EmployeeDetailScreen extends StatelessWidget {
         },
       );
 
-      // Danh sách endpoints để thử kết nối
-      final endpointsToTry = [
-        'http://localhost:8080/api/salaries/${employee.id}',
-        'http://10.0.2.2:8080/api/salaries/${employee.id}',
-        'http://127.0.0.1:8080/api/salaries/${employee.id}',
-      ];
+      // Endpoint cho salaries
+      final endpoint = '${ApiConfig.salariesEndpoint}/${employee.id}';
       
       // Parse các giá trị số
       final basicSalaryValue = int.tryParse(basicSalary) ?? 0;
@@ -433,41 +430,37 @@ class EmployeeDetailScreen extends StatelessWidget {
       bool success = false;
       String errorMessage = '';
       
-      for (String endpoint in endpointsToTry) {
-        try {
-          print('DEBUG: Sending salary update request to: $endpoint');
-          
-          final response = await http.put(
-            Uri.parse(endpoint),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode(requestBody),
-          ).timeout(const Duration(seconds: 10));
-          
-          print('DEBUG: Salary update response status: ${response.statusCode}');
-          print('DEBUG: Salary update response body: ${response.body}');
-          
-          if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
-            success = true;
-            break;
-          } else {
-            errorMessage = 'Mã lỗi: ${response.statusCode}';
-            if (response.body.isNotEmpty) {
-              try {
-                final errorBody = jsonDecode(response.body);
-                errorMessage += ' - ${errorBody['message'] ?? errorBody.toString()}';
-              } catch (e) {
-                errorMessage += ' - ${response.body}';
-              }
+      try {
+        print('DEBUG: Sending salary update request to: $endpoint');
+        
+        final response = await http.put(
+          Uri.parse(endpoint),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(requestBody),
+        ).timeout(const Duration(seconds: 10));
+        
+        print('DEBUG: Salary update response status: ${response.statusCode}');
+        print('DEBUG: Salary update response body: ${response.body}');
+        
+        if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+          success = true;
+        } else {
+          errorMessage = 'Mã lỗi: ${response.statusCode}';
+          if (response.body.isNotEmpty) {
+            try {
+              final errorBody = jsonDecode(response.body);
+              errorMessage += ' - ${errorBody['message'] ?? errorBody.toString()}';
+            } catch (e) {
+              errorMessage += ' - ${response.body}';
             }
           }
-        } catch (e) {
-          print('DEBUG: Failed to update salary with endpoint $endpoint: $e');
-          errorMessage = e.toString();
-          continue;
         }
+      } catch (e) {
+        print('DEBUG: Failed to update salary with endpoint $endpoint: $e');
+        errorMessage = e.toString();
       }
       
       // Đóng dialog loading
@@ -506,6 +499,8 @@ class EmployeeDetailScreen extends StatelessWidget {
 
   // Gửi yêu cầu đăng ký xác thực khuôn mặt
   Future<void> _registerFaceAuthentication(BuildContext context) async {
+    bool dialogShown = false;
+    
     try {
       // Hiển thị dialog loading
       showDialog(
@@ -524,14 +519,8 @@ class EmployeeDetailScreen extends StatelessWidget {
           );
         },
       );
+      dialogShown = true;
 
-      // Danh sách endpoints để thử kết nối
-      final endpointsToTry = [
-        'http://localhost:8080/api/face-register-requests',
-        'http://10.0.2.2:8080/api/face-register-requests',
-        'http://127.0.0.1:8080/api/face-register-requests',
-      ];
-      
       // Lấy userId từ employee object
       final userId = employee.id; 
       bool success = false;
@@ -539,38 +528,68 @@ class EmployeeDetailScreen extends StatelessWidget {
       
       print('DEBUG: Registering face authentication for employee: ${employee.fullName}, ID: $userId');
       
-      for (String endpoint in endpointsToTry) {
-        try {
-          final url = '$endpoint?userId=$userId';
-          print('DEBUG: Sending face registration request to: $url');
+      try {
+        final url = '${ApiConfig.faceRegisterEndpoint}?userId=$userId';
+        print('DEBUG: Sending face registration request to: $url');
           
-          final response = await http.post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-          ).timeout(const Duration(seconds: 10));
-          
-          print('DEBUG: Face registration response status: ${response.statusCode}');
-          print('DEBUG: Face registration response body: ${response.body}');
-          
-          if (response.statusCode == 200 || response.statusCode == 201) {
-            success = true;
-            break;
+        final response = await http.post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 10));
+        
+        print('DEBUG: Face registration response status: ${response.statusCode}');
+        print('DEBUG: Face registration response body: ${response.body}');
+        
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          success = true;
+        } else if (response.statusCode == 500) {
+          // Xử lý lỗi server
+          final responseBody = response.body;
+          if (responseBody.contains('Query did not return a unique result')) {
+            errorMessage = 'Lỗi dữ liệu: Có dữ liệu trùng lặp trong hệ thống. Vui lòng liên hệ quản trị viên.';
+          } else if (responseBody.contains('Internal Server Error')) {
+            errorMessage = 'Lỗi server nội bộ. Vui lòng thử lại sau hoặc liên hệ quản trị viên.';
           } else {
-            errorMessage = 'Mã lỗi: ${response.statusCode}';
+            errorMessage = 'Lỗi server (${response.statusCode}): ${response.reasonPhrase}';
           }
-        } catch (e) {
-          print('DEBUG: Failed to register face with endpoint $endpoint: $e');
-          errorMessage = e.toString();
-          continue;
+        } else if (response.statusCode == 400) {
+          // Xử lý lỗi 400 - Bad Request
+          final responseBody = response.body;
+          if (responseBody.contains('User đã có yêu cầu đăng ký xác thực')) {
+            // Trường hợp đặc biệt: user đã có yêu cầu trước đó
+            // Đóng dialog loading trước
+            if (dialogShown) {
+              Navigator.pop(context);
+              dialogShown = false;
+            }
+            // Hiển thị dialog thông báo
+            _showSimpleExistingRequestDialog(context);
+            return; // Không cần xử lý thêm
+          } else if (responseBody.contains('User not found')) {
+            errorMessage = 'Không tìm thấy thông tin nhân viên. Vui lòng kiểm tra lại.';
+          } else {
+            errorMessage = 'Dữ liệu gửi lên không hợp lệ: $responseBody';
+          }
+        } else if (response.statusCode == 404) {
+          errorMessage = 'Không tìm thấy endpoint API. Vui lòng liên hệ quản trị viên.';
+        } else {
+          errorMessage = 'Lỗi không xác định (${response.statusCode}): ${response.reasonPhrase}';
+        }
+      } catch (e) {
+        print('DEBUG: Failed to register face with endpoint ${ApiConfig.faceRegisterEndpoint}: $e');
+        if (e.toString().contains('TimeoutException')) {
+          errorMessage = 'Kết nối quá thời gian chờ. Vui lòng kiểm tra kết nối mạng và thử lại.';
+        } else if (e.toString().contains('SocketException')) {
+          errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+        } else {
+          errorMessage = 'Lỗi kết nối: ${e.toString()}';
         }
       }
       
-      // Đóng dialog loading
-      Navigator.pop(context);
-      
+      // Hiển thị kết quả
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -589,17 +608,166 @@ class EmployeeDetailScreen extends StatelessWidget {
         );
       }
     } catch (e) {
-      // Đảm bảo dialog loading được đóng nếu có lỗi
-      Navigator.pop(context);
-      
+      // Xử lý lỗi không mong muốn
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: $e'),
+          content: Text('Lỗi không mong muốn: $e'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
         ),
       );
+    } finally {
+      // Đảm bảo dialog loading được đóng trong mọi trường hợp
+      if (dialogShown) {
+        try {
+          Navigator.pop(context);
+        } catch (e) {
+          print('DEBUG: Error closing dialog: $e');
+        }
+      }
     }
+  }
+
+  // Hiển thị thông báo đơn giản khi user đã có yêu cầu đăng ký trước đó
+  void _showSimpleExistingRequestDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Thông báo'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Nhân viên ${employee.fullName} đã có yêu cầu đăng ký xác thực khuôn mặt trước đó và đang chờ xử lý.'),
+              const SizedBox(height: 12),
+              const Text('Vui lòng liên hệ quản trị viên để kiểm tra trạng thái yêu cầu hoặc chờ hoàn tất quá trình xử lý.', 
+                style: TextStyle(fontSize: 14, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  // Kiểm tra trạng thái yêu cầu hiện tại
+  Future<void> _checkExistingRequestStatus(BuildContext context, String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.faceRegisterEndpoint}?userId=$userId'),
+        headers: ApiConfig.defaultHeaders,
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> requests = jsonDecode(response.body);
+        if (requests.isNotEmpty) {
+          final request = requests.first;
+          final status = request['status'] ?? 'UNKNOWN';
+          final requestedAt = request['requestedAt'] ?? 'Không rõ';
+          
+          _showRequestStatusDialog(context, status, requestedAt);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không tìm thấy yêu cầu nào.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể kiểm tra trạng thái: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi khi kiểm tra trạng thái: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Hiển thị dialog trạng thái yêu cầu
+  void _showRequestStatusDialog(BuildContext context, String status, String requestedAt) {
+    String statusText;
+    Color statusColor;
+    
+    switch (status) {
+      case 'PENDING':
+        statusText = 'Đang chờ xử lý';
+        statusColor = Colors.orange;
+        break;
+      case 'PROCESSING':
+        statusText = 'Đang xử lý';
+        statusColor = Colors.blue;
+        break;
+      case 'DONE':
+        statusText = 'Đã hoàn thành';
+        statusColor = Colors.green;
+        break;
+      default:
+        statusText = 'Không xác định';
+        statusColor = Colors.grey;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Trạng thái yêu cầu'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('Trạng thái: '),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: statusColor),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Thời gian tạo: $requestedAt'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {

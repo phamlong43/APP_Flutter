@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/api_endpoints.dart';
 import 'employee_list_screen.dart';
 import '../services/user_api.dart';
 
@@ -34,7 +35,7 @@ class _AssignTaskScreenState extends State<AssignTaskScreen> {
     };
     try {
       final res = await http.post(
-        Uri.parse('http://10.0.2.2:8080/tasks'),
+        Uri.parse(ApiEndpoints.tasksUrl),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(body),
       );

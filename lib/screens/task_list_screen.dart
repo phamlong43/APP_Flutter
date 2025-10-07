@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../services/api_endpoints.dart';
 
 class TaskListScreen extends StatefulWidget {
   final List<Map<String, dynamic>> tasks;
@@ -35,7 +36,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Future<void> _fetchTasks() async {
     // Không setState({ _loading = true }) khi auto-refresh, chỉ khi lần đầu
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/tasks/all')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.allTasksUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -294,7 +295,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     setState(() { _loading = true; });
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:8080/tasks/update-status'),
+        Uri.parse(ApiEndpoints.updateTaskStatusUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'taskId': taskId,

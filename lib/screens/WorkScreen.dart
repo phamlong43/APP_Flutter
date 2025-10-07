@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../services/api_endpoints.dart';
+import '../config/api_config.dart';
 
 class WorkScreen extends StatefulWidget {
   final bool isAdmin;
@@ -18,26 +20,14 @@ class _WorkScreenState extends State<WorkScreen> {
   String? _workingBaseUrl; // Lưu URL working để dùng cho tất cả requests
   Map<String, dynamic> _projectIdMap = {}; // Lưu mapping projectName + id -> parsed id
   
-  // Cấu hình base URL - tự động detect platform
+  // Cấu hình base URL - sử dụng ApiConfig centralized
   static String get baseUrl {
-    // Thử nhiều URL khác nhau cho các trường hợp khác nhau
-    if (kIsWeb) {
-      return 'http://localhost:8080'; // Web
-    } else if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8080'; // Android Emulator
-    } else if (Platform.isIOS) {
-      return 'http://localhost:8080'; // iOS Simulator
-    } else {
-      return 'http://localhost:8080'; // Desktop
-    }
+    return ApiConfig.baseHost;
   }
   
   // Backup URLs để thử khi main URL fail
-  static const List<String> backupUrls = [
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'http://10.0.2.2:8080',
-    'http://192.168.1.100:8080', // Thay bằng IP thực của máy
+  static List<String> get backupUrls => [
+    ApiEndpoints.workScreenBaseUrl,
   ];
 
   // Helper function để test connection với multiple URLs

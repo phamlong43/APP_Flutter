@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'Personal_Information_Screen.dart';
+import '../services/api_endpoints.dart';
 
 class PersonalInformationViewScreen extends StatefulWidget {
   final String username;
@@ -23,7 +24,7 @@ class _PersonalInformationViewScreenState extends State<PersonalInformationViewS
 
   Future<void> fetchUserInfo() async {
     final username = widget.username;
-    final url = Uri.parse('http://10.0.2.2:8080/users/$username');
+    final url = Uri.parse(ApiEndpoints.getUserUrl(username));
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {

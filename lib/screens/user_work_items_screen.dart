@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'create_work_item_screen.dart';
 import '../models/work_item.dart';
+import '../config/api_config.dart';
 
 class UserWorkItemsScreen extends StatefulWidget {
   final String userId;
@@ -33,7 +34,7 @@ class _UserWorkItemsScreenState extends State<UserWorkItemsScreen> {
       _isLoading = true;
     });
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/requests/my?username=${widget.userName}')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse('${ApiConfig.requestsEndpoint}/my?username=${widget.userName}')).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         if (data is List) {

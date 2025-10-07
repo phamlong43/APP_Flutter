@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../task_list_screen.dart';
 import '../request_list_screen.dart';
+import '../../services/api_endpoints.dart';
 
 class AdminStatCards extends StatefulWidget {
   final bool isLoadingUsers;
@@ -55,7 +56,7 @@ class _AdminStatCardsState extends State<AdminStatCards> {
     setState(() { _loading = true; });
     try {
       // Lấy danh sách yêu cầu (requests) từ endpoint đúng
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/requests/all')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.allRequestsUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -77,7 +78,7 @@ class _AdminStatCardsState extends State<AdminStatCards> {
 
   Future<void> _fetchUserCount() async {
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/users')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.usersUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -93,7 +94,7 @@ class _AdminStatCardsState extends State<AdminStatCards> {
 
   Future<void> _fetchTaskCount() async {
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/tasks/all')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.allTasksUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
@@ -121,7 +122,7 @@ class _AdminStatCardsState extends State<AdminStatCards> {
           onTap: () async {
             // Lấy danh sách yêu cầu (requests) từ API và chuyển sang màn hình danh sách yêu cầu
             try {
-              final response = await http.get(Uri.parse('http://10.0.2.2:8080/requests/all')).timeout(const Duration(seconds: 10));
+              final response = await http.get(Uri.parse(ApiEndpoints.allRequestsUrl)).timeout(const Duration(seconds: 10));
               if (response.statusCode == 200) {
                 final decoded = jsonDecode(response.body);
                 if (decoded is List) {

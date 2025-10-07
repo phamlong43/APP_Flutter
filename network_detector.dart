@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'lib/services/api_endpoints.dart';
 
 void main() async {
   print('🔍 NETWORK CONFIGURATION DETECTOR 🔍\n');
@@ -39,7 +40,7 @@ Future<void> suggestUrls() async {
     // Default URLs
     suggestedUrls.add('http://localhost:8080');
     suggestedUrls.add('http://127.0.0.1:8080');
-    suggestedUrls.add('http://10.0.2.2:8080'); // Android emulator
+    suggestedUrls.add(ApiEndpoints.baseUrl); // Configured API URL
     
     // Find local IP addresses
     for (NetworkInterface interface in interfaces) {
@@ -64,7 +65,7 @@ Future<void> suggestUrls() async {
     print('📝 Instructions:');
     print('1. Make sure your backend server is running on port 8080');
     print('2. Try each URL one by one in your Flutter app');
-    print('3. For Android Emulator, use: http://10.0.2.2:8080');
+    print('3. Current configured URL: ${ApiEndpoints.baseUrl}');
     print('4. For iOS Simulator, use: http://localhost:8080');
     print('5. For physical devices, use your computer\'s IP address');
     

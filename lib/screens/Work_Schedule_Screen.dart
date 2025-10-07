@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../services/api_endpoints.dart';
 
 
 class WorkScheduleScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   }
 
   Future<void> fetchAllWorkSchedules() async {
-    final url = Uri.parse('http://10.0.2.2:8080/api/workschedules?employeeId=${widget.employeeId}');
+    final url = Uri.parse(ApiEndpoints.getWorkScheduleUrl(widget.employeeId.toString()));
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -240,7 +241,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
                             "updatedAt": now.toIso8601String(),
                           };
                           // Gửi API tạo lịch làm việc
-                          final url = Uri.parse('http://10.0.2.2:8080/api/workschedules');
+                          final url = Uri.parse(ApiEndpoints.createWorkScheduleUrl);
                           try {
                             final response = await http.post(
                               url,

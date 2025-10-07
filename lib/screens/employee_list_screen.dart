@@ -5,6 +5,7 @@ import 'employee_detail_screen.dart';
 import '../models/employee.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/api_endpoints.dart';
 
 class EmployeeListScreen extends StatefulWidget {
   const EmployeeListScreen({Key? key}) : super(key: key);
@@ -35,7 +36,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     if (_loading) return;
     _loading = true;
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/users')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.usersUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> newUsers = json.decode(response.body);
         if (!listEquals(newUsers, users)) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import '../services/api_endpoints.dart';
 
 class RewardDisciplineScreen extends StatefulWidget {
   final bool isAdmin;
@@ -89,7 +90,7 @@ class _RewardDisciplineScreenState extends State<RewardDisciplineScreen> with Si
     try {
       final endpointsToTry = [
         'http://localhost:8080/users',
-        'http://10.0.2.2:8080/users',
+        ApiEndpoints.usersUrl,
       ];
       
       bool success = false;
@@ -187,7 +188,7 @@ class _RewardDisciplineScreenState extends State<RewardDisciplineScreen> with Si
           
       final endpointsToTry = [
         'http://localhost:8080/api/reward-discipline$endpointSuffix',
-        'http://10.0.2.2:8080/api/reward-discipline$endpointSuffix',
+        ApiEndpoints.getRewardDisciplineWithFilterUrl(endpointSuffix),
       ];
       
       for (String endpoint in endpointsToTry) {
@@ -285,7 +286,7 @@ class _RewardDisciplineScreenState extends State<RewardDisciplineScreen> with Si
       
       final endpointsToTry = [
         'http://localhost:8080/api/reward-discipline',
-        'http://10.0.2.2:8080/api/reward-discipline',
+        ApiEndpoints.rewardDisciplineUrl,
       ];
       
       bool success = false;

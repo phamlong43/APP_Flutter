@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../services/api_endpoints.dart';
 
 class PostEditScreen extends StatefulWidget {
   final Map<String, dynamic>? post;
@@ -49,13 +50,13 @@ class _PostEditScreenState extends State<PostEditScreen> {
       http.Response res;
       if (widget.isEdit && widget.post?['postId'] != null) {
         res = await http.put(
-          Uri.parse('http://10.0.2.2:8080/api/posts/${widget.post!['postId']}'),
+          Uri.parse(ApiEndpoints.getPostByIdUrl(widget.post!['postId'])),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(data),
         );
       } else {
         res = await http.post(
-          Uri.parse('http://10.0.2.2:8080/api/posts'),
+          Uri.parse(ApiEndpoints.postsUrl),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(data),
         );

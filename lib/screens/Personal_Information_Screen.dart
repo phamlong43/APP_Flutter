@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class PersonalInformationScreen extends StatefulWidget {
   const PersonalInformationScreen({super.key});
@@ -75,7 +76,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   Future<void> fetchUserInfo() async {
     // TODO: Thay userId bằng id thực tế của user đang đăng nhập
     const userId = '1';
-    final url = Uri.parse('http://10.0.2.2:8080/users/$userId');
+    final url = Uri.parse('${ApiConfig.userEndpoint}/$userId');
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {

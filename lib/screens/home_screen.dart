@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_testt/screens/AddWorkHoursScreen.dart';
 import 'package:flutter_testt/screens/report_screen.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:local_auth_android/local_auth_android.dart';
+import 'package:flutter/services.dart';
+import 'dart:io' show Platform;
+import 'dart:async';
 import '../db/database_helper.dart';
 import 'work_approval_screen.dart';
 import 'create_work_item_screen.dart';
@@ -33,9 +38,15 @@ import 'components/admin_stat_cards.dart';
 import 'components/admin_quick_report_card.dart';
 import 'components/admin_recent_activity_card.dart';
 import 'admin_statistics_screen.dart';
+import '../services/api_endpoints.dart';
 import 'digital_signature_screen.dart';
 import 'LichSuChamCongScreen.dart';
 import 'AttendanceCalendarScreen.dart';
+import '../utils/biometric_auth_helper.dart';
+import 'biometric_auth_example.dart';
+import '../services/app_usage_tracker_new.dart';
+import '../widgets/usage_warning_dialog.dart';
+import 'biometric_auth_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isAdmin;
@@ -66,6 +77,371 @@ class _HomeScreenState extends State<HomeScreen> {
   // State để theo dõi trạng thái check-in/check-out
   bool _isCheckedIn = false;
   DateTime? _checkInTime;
+  bool _isPendingAuthentication = false; // Theo dõi khi đang chờ Pi4 xác thực
+  Timer? _pendingCheckTimer; // Timer để kiểm tra trạng thái pending
+
+  // Hàm lấy lời chào theo thời gian
+  String _getGreetingByTime() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Chào buổi sáng';
+    } else if (hour >= 12 && hour < 18) {
+      return 'Chào buổi chiều';
+    } else if (hour >= 18 && hour < 22) {
+      return 'Chào buổi tối';
+    } else {
+      return 'Chào bạn';
+    }
+  }
+
+  // Hàm kiểm tra và hiển thị thông tin thiết bị sinh trắc học
+  Future<void> _checkBiometricCapabilities() async {
+    final LocalAuthentication auth = LocalAuthentication();
+    
+    print('=== KIỂM TRA KHẢ NĂNG SINH TRẮC HỌC THIẾT BỊ ===');
+    
+    // Thông tin platform
+    print('📱 THÔNG TIN THIẾT BỊ:');
+    print('   - Platform: ${Platform.operatingSystem}');
+    print('   - Version: ${Platform.operatingSystemVersion}');
+    
+    try {
+      // 1. Kiểm tra hỗ trợ thiết bị
+      final bool isDeviceSupported = await auth.isDeviceSupported();
+      print('🔍 Device supports local authentication: $isDeviceSupported');
+      
+      // 2. Kiểm tra khả năng sử dụng sinh trắc học
+      final bool canCheckBiometrics = await auth.canCheckBiometrics;
+      print('🔍 Can check biometrics: $canCheckBiometrics');
+      
+      // 3. Lấy danh sách các phương thức sinh trắc học có sẵn
+      final List<BiometricType> availableBiometrics = await auth.getAvailableBiometrics();
+      print('🔍 Available biometric types:');
+      if (availableBiometrics.isEmpty) {
+        print('   ❌ Không có phương thức sinh trắc học nào được thiết lập');
+      } else {
+        for (final biometric in availableBiometrics) {
+          switch (biometric) {
+            case BiometricType.face:
+              print('   ✅ Face ID / Face Recognition');
+              break;
+            case BiometricType.fingerprint:
+              print('   ✅ Fingerprint / Vân tay');
+              break;
+            case BiometricType.iris:
+              print('   ✅ Iris Recognition');
+              break;
+            case BiometricType.strong:
+              print('   ✅ Strong Biometric (Class 3)');
+              break;
+            case BiometricType.weak:
+              print('   ✅ Weak Biometric (Class 2)');
+              break;
+          }
+        }
+      }
+      
+      // 4. Kiểm tra trạng thái tổng thể
+      print('📊 TỔNG KẾT:');
+      print('   - Thiết bị hỗ trợ: ${isDeviceSupported ? "✅ Có" : "❌ Không"}');
+      print('   - Có thể kiểm tra sinh trắc học: ${canCheckBiometrics ? "✅ Có" : "❌ Không"}');
+      print('   - Số phương thức có sẵn: ${availableBiometrics.length}');
+      
+      if (isDeviceSupported && canCheckBiometrics && availableBiometrics.isNotEmpty) {
+        print('🎉 THIẾT BỊ SẴN SÀNG CHO XÁC THỰC SINH TRẮC HỌC');
+      } else {
+        print('⚠️  THIẾT BỊ CHƯA SẴN SÀNG - Cần kiểm tra cài đặt');
+        
+        if (!isDeviceSupported) {
+          print('   💡 Thiết bị không hỗ trợ xác thực cục bộ');
+        }
+        if (!canCheckBiometrics) {
+          print('   💡 Không thể kiểm tra sinh trắc học - có thể chưa được bật trong cài đặt');
+        }
+        if (availableBiometrics.isEmpty) {
+          print('   💡 Chưa có phương thức sinh trắc học nào được đăng ký');
+          print('   💡 Hãy vào Settings > Security > Fingerprint để thiết lập');
+        }
+      }
+      
+    } catch (e) {
+      print('❌ LỖI KHI KIỂM TRA SINH TRẮC HỌC: $e');
+    }
+    
+    print('================================================');
+  }
+
+  // Hàm xác thực với quyền sinh trắc học
+  Future<bool> _authenticateWithBiometrics(String action) async {
+    print('🔐 Starting biometric permission request for: $action');
+    
+    // Bước 1: Yêu cầu quyền từ người dùng
+    final bool userPermission = await _showSimpleAuthDialog(action);
+    
+    if (!userPermission) {
+      print('🚫 User denied biometric permission');
+      return false;
+    }
+    
+    print('✅ User granted biometric permission');
+    
+    // Nếu người dùng đồng ý, thử xác thực sinh trắc học (tùy chọn)
+    final LocalAuthentication auth = LocalAuthentication();
+    
+    try {
+      // Kiểm tra nhanh xem có sinh trắc học không
+      final bool isAvailable = await auth.isDeviceSupported();
+      final List<BiometricType> availableBiometrics = await auth.getAvailableBiometrics();
+      
+      print(' Device supports biometric: $isAvailable');
+      print('� Available biometrics: ${availableBiometrics.length} methods');
+      
+      // Nếu có sinh trắc học, thử sử dụng (không bắt buộc)
+      if (isAvailable && availableBiometrics.isNotEmpty) {
+        print('🚀 Attempting optional biometric authentication...');
+        
+        try {
+          final bool didAuthenticate = await auth.authenticate(
+            localizedReason: 'Xác thực bổ sung để $action',
+            authMessages: const [
+              AndroidAuthMessages(
+                signInTitle: 'Xác thực nhanh (Tùy chọn)',
+                cancelButton: 'Bỏ qua',
+                biometricHint: 'Dùng vân tay hoặc bỏ qua',
+              ),
+            ],
+            options: const AuthenticationOptions(
+              stickyAuth: false, // Không bắt buộc
+              biometricOnly: false,
+              useErrorDialogs: false, // Không hiển thị lỗi
+              sensitiveTransaction: false,
+            ),
+          );
+          
+          print('✅ Biometric result: $didAuthenticate');
+          return true; // Luôn trả về true vì đã có user consent
+        } catch (e) {
+          print('⚠️  Biometric failed (not required): $e');
+          return true; // Vẫn cho phép vì user đã đồng ý
+        }
+      } else {
+        print('ℹ️  No biometrics available, using user consent only');
+        return true; // Dựa trên user consent
+      }
+    } catch (e) {
+      print('⚠️  Authentication error (fallback to user consent): $e');
+      return true; // Vẫn cho phép dựa trên user consent
+    }
+  }
+
+  // Hàm hiển thị dialog yêu cầu quyền sinh trắc học
+  Future<bool> _showSimpleAuthDialog(String action) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // Không cho phép ấn ngoài để đóng
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.fingerprint, color: Colors.orange[600]),
+            const SizedBox(width: 8),
+            const Text('Cấp quyền sinh trắc học'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ứng dụng cần quyền truy cập sinh trắc học',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Để $action một cách an toàn',
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.security, color: Colors.orange[700], size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Quyền được sử dụng để:',
+                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• Truy cập cảm biến vân tay', style: TextStyle(fontSize: 12)),
+                        Text('• Sử dụng nhận diện khuôn mặt', style: TextStyle(fontSize: 12)),
+                        Text('• Xác thực bảo mật chấm công', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[600], size: 16),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    'Dữ liệu sinh trắc học chỉ được xử lý cục bộ trên thiết bị',
+                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Từ chối',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange[600],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            icon: const Icon(Icons.security, size: 18),
+            label: const Text('Cấp quyền'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  // Hàm hiển thị dialog hướng dẫn thiết lập sinh trắc học
+  Future<bool> _showBiometricSetupDialog(String action) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.fingerprint, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Cần thiết lập xác thực'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Thiết bị chưa thiết lập xác thực sinh trắc học.\n',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const Text('🔧 Để thiết lập:'),
+            const SizedBox(height: 8),
+            const Text('1. Vào Settings (Cài đặt)'),
+            const Text('2. Chọn Security & privacy (Bảo mật)'),
+            const Text('3. Chọn Fingerprint (Vân tay)'),
+            const Text('4. Thêm vân tay của bạn'),
+            const SizedBox(height: 12),
+            const Text(
+              'Hoặc bạn có thể tiếp tục mà không xác thực.',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('continue'),
+            child: const Text('Tiếp tục'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop('settings'),
+            child: const Text('Mở cài đặt'),
+          ),
+        ],
+      ),
+    );
+
+    switch (result) {
+      case 'continue':
+        return true;
+      case 'settings':
+        // Thử mở cài đặt (có thể không hoạt động trên tất cả thiết bị)
+        try {
+          // Có thể sử dụng url_launcher để mở settings
+          _showErrorDialog('Vui lòng mở Settings > Security > Fingerprint để thiết lập vân tay.');
+        } catch (e) {
+          _showErrorDialog('Không thể mở cài đặt tự động. Vui lòng mở thủ công.');
+        }
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  // Hàm hiển thị dialog xác nhận
+  Future<bool> _showConfirmationDialog(String title, String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Tiếp tục'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  // Hàm hiển thị lỗi
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Thông báo'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -76,6 +452,156 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     _checkTodayAttendanceStatus(); // Kiểm tra trạng thái chấm công hôm nay
     _checkCurrentAttendanceStatus(); // Kiểm tra trạng thái chấm công hiện tại
+    _checkBiometricCapabilities(); // Kiểm tra khả năng sinh trắc học của thiết bị
+    _initializeUsageTracker(); // Khởi tạo theo dõi thời lượng sử dụng
+  }
+
+  @override
+  void dispose() {
+    AppUsageTracker.instance.stopTracker(); // Dừng tracker khi widget bị hủy
+    super.dispose();
+  }
+
+  // Khởi tạo theo dõi thời lượng sử dụng
+  Future<void> _initializeUsageTracker() async {
+    try {
+      // Thiết lập callback cho cảnh báo
+      AppUsageTracker.instance.onUsageWarning = (minutes) {
+        if (mounted) {
+          _showUsageWarning(minutes, isLimit: false);
+        }
+      };
+
+      // Thiết lập callback cho giới hạn
+      AppUsageTracker.instance.onUsageLimit = (minutes) {
+        if (mounted) {
+          _showUsageWarning(minutes, isLimit: true);
+        }
+      };
+
+      // Khởi tạo tracker
+      await AppUsageTracker.instance.initTracker();
+      
+      print('✅ Usage tracker initialized successfully');
+    } catch (e) {
+      print('❌ Failed to initialize usage tracker: $e');
+    }
+  }
+
+  // Hiển thị cảnh báo sử dụng
+  void _showUsageWarning(int minutes, {bool isLimit = false}) {
+    showDialog(
+      context: context,
+      barrierDismissible: !isLimit, // Không cho phép đóng nếu là giới hạn
+      builder: (context) => UsageWarningDialog(
+        usageMinutes: minutes,
+        isLimit: isLimit,
+      ),
+    );
+  }
+
+  // Hiển thị dialog test thời lượng sử dụng
+  void _showUsageTestDialog() {
+    final stats = AppUsageTracker.instance.getUsageStats();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.timer, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Test Thời lượng sử dụng'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Thống kê hiện tại:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('• Thời gian đã dùng: ${stats['currentMinutes']} phút'),
+            Text('• Thời gian còn lại: ${stats['remainingMinutes']} phút'),
+            Text('• Trạng thái: ${stats['isOverLimit'] ? 'Vượt giới hạn' : 'Bình thường'}'),
+            Text('• Đã cảnh báo: ${stats['warningShown'] ? 'Có' : 'Chưa'}'),
+            Text('• Đã đạt giới hạn: ${stats['limitShown'] ? 'Có' : 'Chưa'}'),
+            
+            const SizedBox(height: 16),
+            const Text(
+              'Test các tình huống:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            
+            // Nút thêm 30 phút để test cảnh báo
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  AppUsageTracker.instance.addTestMinutes(30);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ Đã thêm 30 phút test')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Thêm 30 phút (Test cảnh báo)'),
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Nút thêm 60 phút để test giới hạn  
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  AppUsageTracker.instance.addTestMinutes(60);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ Đã thêm 60 phút test')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Thêm 60 phút (Test giới hạn)'),
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Nút reset
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async {
+                  await AppUsageTracker.instance.resetUsage();
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('🔄 Đã reset dữ liệu sử dụng')),
+                  );
+                },
+                child: const Text('Reset dữ liệu'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   // Function để kiểm tra trạng thái chấm công hôm nay
@@ -83,14 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
       
-      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
-      final endpointsToTry = [
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-      ];
+      // Danh sách endpoints để thử
+      final endpointsToTry = ApiEndpoints.getAttendanceEndpoints();
 
       for (String endpoint in endpointsToTry) {
         try {
@@ -109,23 +629,64 @@ class _HomeScreenState extends State<HomeScreen> {
             
             // Tìm record hôm nay
             if (data is List && data.isNotEmpty) {
-              final todayRecord = data.firstWhere(
-                (record) => record['workingDate'] == today,
-                orElse: () => null,
-              );
+              // Tìm record hôm nay - ưu tiên record có status "in"
+              final todayRecords = data.where((record) => record['workingDate'] == today).toList();
               
-              if (todayRecord != null) {
-                setState(() {
-                  // Kiểm tra trạng thái: đã check-in nhưng chưa check-out
-                  _isCheckedIn = todayRecord['checkIn'] != null && todayRecord['checkOut'] == null;
-                  if (todayRecord['checkIn'] != null) {
-                    _checkInTime = DateTime.parse(todayRecord['checkIn']);
+              if (todayRecords.isNotEmpty) {
+                // Tìm record đang trong quá trình xử lý (pending, in, out)
+                final pendingRecord = todayRecords.firstWhere(
+                  (record) {
+                    String recordStatus = (record['status'] ?? '').toString().toLowerCase();
+                    return (recordStatus == 'pending' || recordStatus == 'in' || recordStatus == 'out') && 
+                           record['checkIn'] != null && 
+                           (record['checkOut'] == null || record['checkOut'].toString().isEmpty);
+                  },
+                  orElse: () => null,
+                );
+                
+                if (pendingRecord != null) {
+                  String recordStatus = (pendingRecord['status'] ?? '').toString().toLowerCase();
+                  setState(() {
+                    _isCheckedIn = (recordStatus == 'in'); // Chỉ hiện nút "Kết thúc ca" khi status = "in"
+                    _isPendingAuthentication = (recordStatus == 'pending' || recordStatus == 'out'); // Đang chờ Pi4
+                    if (pendingRecord['checkIn'] != null) {
+                      _checkInTime = DateTime.parse(pendingRecord['checkIn']);
+                    }
+                  });
+                  print('DEBUG: Found record - status: ${pendingRecord['status']}, isCheckedIn: $_isCheckedIn, isPending: $_isPendingAuthentication, checkInTime: $_checkInTime');
+                  
+                  // Start timer nếu đang pending
+                  if (_isPendingAuthentication) {
+                    _startPendingCheckTimer();
                   }
-                });
-                print('DEBUG: Found today record - isCheckedIn: $_isCheckedIn, checkInTime: $_checkInTime');
+                } else {
+                  // Không có record đang active - kiểm tra xem có record completed không
+                  final completedRecord = todayRecords.firstWhere(
+                    (record) {
+                      String recordStatus = (record['status'] ?? '').toString().toLowerCase();
+                      return recordStatus == 'completed' && 
+                             record['checkIn'] != null && 
+                             record['checkOut'] != null;
+                    },
+                    orElse: () => null,
+                  );
+                  
+                  setState(() {
+                    _isCheckedIn = false;
+                    _isPendingAuthentication = false;
+                    _checkInTime = null;
+                  });
+                  
+                  if (completedRecord != null) {
+                    print('DEBUG: Found COMPLETED record - status: ${completedRecord['status']}, ready for next check-in');
+                  } else {
+                    print('DEBUG: Found today records but none active or completed: ${todayRecords.map((r) => r['status']).join(', ')}');
+                  }
+                }
               } else {
                 setState(() {
                   _isCheckedIn = false;
+                  _isPendingAuthentication = false;
                   _checkInTime = null;
                 });
                 print('DEBUG: No record found for today');
@@ -150,14 +711,8 @@ class _HomeScreenState extends State<HomeScreen> {
       
       print('DEBUG: Checking current attendance status for date: $workingDate');
 
-      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
-      final endpointsToTry = [
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-      ];
+      // Danh sách endpoints để thử
+      final endpointsToTry = ApiEndpoints.getAttendanceEndpoints();
 
       // Thử từng endpoint để lấy dữ liệu
       for (String endpoint in endpointsToTry) {
@@ -184,24 +739,36 @@ class _HomeScreenState extends State<HomeScreen> {
               print('DEBUG: Today records count: ${todayRecords.length}');
               
               final activeRecord = todayRecords.firstWhere(
-                (record) => record['checkOut'] == null || record['checkOut'].toString().isEmpty,
+                (record) {
+                  String recordStatus = (record['status'] ?? '').toString().toLowerCase();
+                  return (recordStatus == 'pending' || recordStatus == 'in' || recordStatus == 'out') && 
+                         (record['checkOut'] == null || record['checkOut'].toString().isEmpty);
+                },
                 orElse: () => null,
               );
               
               if (activeRecord != null) {
-                // Có record đang trong ca (chưa check-out)
-                print('DEBUG: Found active record: ${jsonEncode(activeRecord)}');
+                // Có record đang trong quá trình xử lý
+                String recordStatus = (activeRecord['status'] ?? '').toString().toLowerCase();
+                print('DEBUG: Found record with status "$recordStatus": ${jsonEncode(activeRecord)}');
                 setState(() {
-                  _isCheckedIn = true;
+                  _isCheckedIn = (recordStatus == 'in'); // Chỉ hiện nút kết thúc ca khi status = "in"
+                  _isPendingAuthentication = (recordStatus == 'pending' || recordStatus == 'out'); // Đang chờ Pi4
                   if (activeRecord['checkIn'] != null) {
                     _checkInTime = DateTime.parse(activeRecord['checkIn']);
                   }
                 });
+                
+                // Start timer nếu đang pending
+                if (_isPendingAuthentication) {
+                  _startPendingCheckTimer();
+                }
               } else {
                 // Không có record đang trong ca
                 print('DEBUG: No active record found');
                 setState(() {
                   _isCheckedIn = false;
+                  _isPendingAuthentication = false;
                   _checkInTime = null;
                 });
               }
@@ -221,6 +788,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Không có dữ liệu chấm công hôm nay
               setState(() {
                 _isCheckedIn = false;
+                _isPendingAuthentication = false;
                 _checkInTime = null;
               });
             }
@@ -239,7 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchUsers() async {
     setState(() { _isLoadingUsers = true; });
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8080/users')).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(ApiEndpoints.usersUrl)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         final allUsers = decoded is List ? decoded : [];
@@ -267,8 +835,61 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Hàm test xác thực với BiometricAuthHelper mới
+  Future<void> _testBiometricAuth() async {
+    print('🧪 TESTING NEW BIOMETRIC AUTHENTICATION');
+    
+    // Sử dụng BiometricAuthHelper mới
+    final bool result = await BiometricAuthHelper.authenticate(
+      context: context,
+      title: 'Test Xác thục Sinh trắc học',
+      subtitle: 'Dùng vân tay hoặc khuôn mặt để kiểm tra hệ thống',
+      cancelText: 'Huỷ test',
+    );
+    
+    print('🧪 New BiometricAuthHelper result: $result');
+    
+    if (result) {
+      // Thành công - hiển thị thông báo và cho phép truy cập tính năng
+      _onBiometricAuthSuccess('Test hệ thống');
+    }
+  }
+
+  // Callback khi xác thực sinh trắc học thành công
+  void _onBiometricAuthSuccess(String action) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Text('Xác thực thành công cho: $action'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    
+    // TODO: Ở đây bạn có thể thêm logic để mở các tính năng bảo mật
+    // Ví dụ: điểm danh, mở cửa, truy cập thông tin nhạy cảm...
+    print('✅ User authenticated successfully for: $action');
+  }
+
+  // Hàm xác thực sinh trắc học cho chấm công
+  Future<bool> _authenticateForAttendance() async {
+    return await BiometricAuthHelper.authenticate(
+      context: context,
+      title: 'Xác thực chấm công',
+      subtitle: 'Dùng vân tay hoặc khuôn mặt để xác nhận danh tính',
+      cancelText: 'Huỷ',
+    );
+  }
+
   // Function để thực hiện check-in (vào ca)
   Future<void> _performCheckIn() async {
+    print('DEBUG: Starting check-in process');
+
     try {
       // Lấy thông tin ngày hiện tại
       final now = DateTime.now();
@@ -284,19 +905,13 @@ class _HomeScreenState extends State<HomeScreen> {
         "checkIn": checkInTime,
         "workingHours": 8,
         "overtimeHours": 0, // Mặc định 0, có thể tính sau
-        "status": "pending"
+        "status": "pending" // Gửi status "pending" để chờ Pi4 xác thực → Pi4 sẽ chuyển thành "in"
       };
 
       print('DEBUG: Check-in data: ${jsonEncode(checkInData)}');
 
-      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
-      final endpointsToTry = [
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-      ];
+      // Danh sách endpoints để thử
+      final endpointsToTry = ApiEndpoints.getAttendanceEndpoints();
 
       bool success = false;
       String lastError = '';
@@ -326,43 +941,50 @@ class _HomeScreenState extends State<HomeScreen> {
               final responseData = jsonDecode(response.body);
               print('DEBUG: Check-in response data: ${jsonEncode(responseData)}');
               
-              // Kiểm tra xem record đã có ID và checkIn time chưa
-              if (responseData['id'] != null && responseData['checkIn'] != null) {
-                print('DEBUG: Check-in verified successfully with ID: ${responseData['id']}');
+              // Kiểm tra xem record đã có ID, checkIn time và status hợp lệ
+              String responseStatus = (responseData['status'] ?? '').toString().toLowerCase();
+              if (responseData['id'] != null && responseData['checkIn'] != null && 
+                  (responseStatus == 'pending' || responseStatus == 'in')) {
+                print('DEBUG: Check-in verified successfully with ID: ${responseData['id']}, status: $responseStatus');
                 success = true;
+                
+                // Chỉ set _isCheckedIn = true khi status là "in" (đã được Pi4 xác thực)
+                // Nếu status vẫn là "pending", chờ Pi4 xác thực
                 setState(() {
-                  _isCheckedIn = true;
+                  _isCheckedIn = (responseStatus == 'in');
+                  _isPendingAuthentication = (responseStatus == 'pending');
                   _checkInTime = now;
                 });
+                
+                // Start timer nếu đang pending
+                if (_isPendingAuthentication) {
+                  _startPendingCheckTimer();
+                }
+                
+                String statusMessage = responseStatus == 'pending' 
+                    ? 'Chờ xác thực từ Pi4...' 
+                    : 'Đã vào ca làm việc!';
+                    
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('✅ Vào ca thành công lúc ${_formatTime(now)}!'),
-                    backgroundColor: Colors.green,
+                    content: Text('✅ Điểm danh thành công lúc ${_formatTime(now)}!\n📋 $statusMessage'),
+                    backgroundColor: responseStatus == 'pending' ? Colors.orange : Colors.green,
                     duration: const Duration(seconds: 3),
                   ),
                 );
                 break; // Thoát khỏi loop khi thành công
               } else {
-                lastError = 'Check-in response thiếu ID hoặc checkIn time';
+                String responseStatus = (responseData['status'] ?? '').toString().toLowerCase();
+                lastError = 'Check-in response thiếu ID, checkIn time hoặc status không hợp lệ (hiện tại: $responseStatus, cần: pending/in)';
                 print('DEBUG: Check-in verification failed - missing ID or checkIn');
                 continue;
               }
             } catch (parseError) {
-              // Nếu không parse được response nhưng status code OK
-              print('DEBUG: Cannot parse response but status OK, assuming success: $parseError');
-              success = true;
-              setState(() {
-                _isCheckedIn = true;
-                _checkInTime = now;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Vào ca thành công lúc ${_formatTime(now)}!'),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-              break;
+              // Nếu không parse được response nhưng status code OK - CHỈ KHI KHÔNG THỂ XÁC MINH STATUS
+              print('DEBUG: Cannot parse response but status OK. Warning: Không thể xác minh status "in": $parseError');
+              // Không nên assume success nếu không thể verify status
+              lastError = 'Không thể xác minh status sau khi vào ca - Response không parse được';
+              continue; // Thử endpoint khác thay vì assume success
             }
           } else {
             lastError = 'Status ${response.statusCode}: ${response.body}';
@@ -400,6 +1022,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Function để thực hiện check-out (kết thúc ca)
   Future<void> _performCheckOut() async {
+    print('DEBUG: Starting check-out process');
+
     try {
       final now = DateTime.now();
       final workingDate = now.toIso8601String().substring(0, 10); // YYYY-MM-DD
@@ -416,13 +1040,8 @@ class _HomeScreenState extends State<HomeScreen> {
       print('DEBUG: Check-out started for date: $workingDate, time: $checkOutTime');
       print('DEBUG: Working hours calculated: $workingHours');
 
-      // Danh sách endpoints để thử (chỉ sử dụng 10.0.2.2)
-      final endpointsToTry = [
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-        'http://10.0.2.2:8080/api/attendance',
-      ];
+      // Danh sách endpoints để thử
+      final endpointsToTry = ApiEndpoints.getAttendanceEndpoints();
 
       bool success = false;
       String lastError = '';
@@ -446,17 +1065,22 @@ class _HomeScreenState extends State<HomeScreen> {
             final data = jsonDecode(getResponse.body);
             
             if (data is List && data.isNotEmpty) {
-              // Tìm record hôm nay có checkOut = null (đang trong ca)
+              // Tìm record hôm nay có status "in" và checkOut = null (đang trong ca)
               final todayRecord = data.firstWhere(
-                (record) => record['workingDate'] == workingDate && 
-                           (record['checkOut'] == null || record['checkOut'].toString().isEmpty),
+                (record) {
+                  String recordStatus = (record['status'] ?? '').toString().toLowerCase();
+                  return record['workingDate'] == workingDate && 
+                         recordStatus == 'in' &&
+                         (record['checkOut'] == null || record['checkOut'].toString().isEmpty);
+                },
                 orElse: () => null,
               );
               
               if (todayRecord != null && todayRecord['id'] != null) {
-                // Bước 2: Cập nhật record với status = out (thay vì gửi checkOut)
+                // Bước 2: Cập nhật record với status = out và checkOut time (Pi4 sẽ chuyển thành "completed")
                 final updateData = {
-                  "status": "out"
+                  "status": "out",
+                  "checkOut": checkOutTime
                 };
 
                 print('DEBUG: Update data: ${jsonEncode(updateData)}');
@@ -491,25 +1115,43 @@ class _HomeScreenState extends State<HomeScreen> {
                     final verifyData = jsonDecode(verifyResponse.body);
                     print('DEBUG: Verify data: ${jsonEncode(verifyData)}');
                     
-                    // Kiểm tra xem status đã đổi thành "out" hoặc checkOut đã được update thành công chưa
-                    if ((verifyData['status'] != null && verifyData['status'] == "out") || 
-                        (verifyData['checkOut'] != null && verifyData['checkOut'].toString().isNotEmpty)) {
+                    // Kiểm tra xem status đã được update và checkOut đã được ghi nhận
+                    String verifyStatus = (verifyData['status'] ?? '').toString().toLowerCase();
+                    if ((verifyStatus == "out" || verifyStatus == "completed") && 
+                        verifyData['checkOut'] != null && verifyData['checkOut'].toString().isNotEmpty) {
                       print('DEBUG: Checkout verified successfully - Status: ${verifyData['status']}, CheckOut: ${verifyData['checkOut']}');
                       success = true;
+                      
+                      // Chỉ set _isCheckedIn = false khi status là "completed" (đã được Pi4 xác thực)
+                      // Nếu status vẫn là "out", chờ Pi4 xác thực
                       setState(() {
-                        _isCheckedIn = false;
-                        _checkInTime = null;
+                        _isCheckedIn = (verifyStatus == "in"); // Chỉ true khi vẫn đang "in"
+                        _isPendingAuthentication = (verifyStatus == "out"); // Đang chờ Pi4 xác thực kết thúc ca
+                        if (verifyStatus == "completed") {
+                          _checkInTime = null;
+                          _isPendingAuthentication = false;
+                        }
                       });
+                      
+                      // Start timer nếu đang pending
+                      if (_isPendingAuthentication) {
+                        _startPendingCheckTimer();
+                      }
+                      
+                      String statusMessage = verifyStatus == 'out' 
+                          ? 'Chờ xác thực kết thúc ca từ Pi4...' 
+                          : 'Đã kết thúc ca làm việc!';
+                          
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('✅ Kết thúc ca thành công lúc ${_formatTime(now)}!\nTổng giờ làm: ${workingHours.toStringAsFixed(2)} giờ'),
-                          backgroundColor: Colors.blue,
+                          content: Text('✅ Ghi nhận kết thúc ca lúc ${_formatTime(now)}!\n📋 $statusMessage\nTổng giờ làm: ${workingHours.toStringAsFixed(2)} giờ'),
+                          backgroundColor: verifyStatus == 'out' ? Colors.orange : Colors.blue,
                           duration: const Duration(seconds: 4),
                         ),
                       );
                       break;
                     } else {
-                      lastError = 'Checkout chưa được update trong database (status hoặc checkOut chưa được cập nhật)';
+                      lastError = 'Checkout chưa hoàn tất - Status hiện tại: "$verifyStatus" (cần "out" hoặc "completed"), CheckOut: ${verifyData['checkOut'] != null ? "có" : "không có"}';
                       print('DEBUG: Checkout verification failed - Status: ${verifyData['status']}, CheckOut field: ${verifyData['checkOut']}');
                       continue;
                     }
@@ -523,7 +1165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   continue;
                 }
               } else {
-                lastError = 'Không tìm thấy record check-in hôm nay';
+                lastError = 'Không tìm thấy record check-in hôm nay với status "in" (đã được Pi4 xác thực)';
                 continue;
               }
             } else {
@@ -576,6 +1218,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final duration = now.difference(_checkInTime!);
     final hours = duration.inMinutes / 60.0;
     return hours.toStringAsFixed(2);
+  }
+
+  // Helper function để start timer kiểm tra pending status
+  void _startPendingCheckTimer() {
+    _pendingCheckTimer?.cancel(); // Cancel timer cũ nếu có
+    
+    if (_isPendingAuthentication) {
+      print('DEBUG: Starting pending check timer');
+      _pendingCheckTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+        print('DEBUG: Checking pending status...');
+        await _checkCurrentAttendanceStatus();
+        
+        // Nếu không còn pending, cancel timer
+        if (!_isPendingAuthentication) {
+          print('DEBUG: No longer pending, canceling timer');
+          timer.cancel();
+        }
+      });
+    }
   }
 
   @override
@@ -740,7 +1401,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.blue,
         title: Text(
-          'Chào buổi trưa, \\${widget.username}!',
+          '${_getGreetingByTime()}, ${widget.username}!',
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
@@ -1203,13 +1864,15 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isCheckedIn ? Colors.red : Colors.green,
+                backgroundColor: _isPendingAuthentication 
+                    ? Colors.orange 
+                    : _isCheckedIn ? Colors.red : Colors.green,
                 padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
               ),
-              onPressed: () async {
+              onPressed: _isPendingAuthentication ? null : () async {
                 if (_isCheckedIn) {
                   // Hiển thị dialog xác nhận kết thúc ca
                   final confirm = await showDialog<bool>(
@@ -1303,14 +1966,73 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    _isCheckedIn ? Icons.logout : Icons.access_time,
-                    color: Colors.white,
-                  ),
+                  if (_isPendingAuthentication) ...[
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Chờ xác thực Pi4...',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ] else ...[
+                    Icon(
+                      _isCheckedIn ? Icons.logout : Icons.access_time,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isCheckedIn ? 'Kết thúc Ca' : 'Vào Ca',
+                      style: const TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        
+        // Hiển thị thông báo trạng thái chờ xác thực Pi4
+        if (!isAdmin && _isPendingAuthentication)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.hourglass_top, color: Colors.orange[700], size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    _isCheckedIn ? 'Kết thúc Ca' : 'Vào Ca',
-                    style: const TextStyle(fontSize: 18, color: Colors.white),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đang chờ xác thực từ hệ thống Pi4',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange[800],
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vui lòng đợi xác thực hoàn tất trước khi thực hiện thao tác tiếp theo',
+                          style: TextStyle(
+                            color: Colors.orange[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1462,6 +2184,45 @@ class _HomeScreenState extends State<HomeScreen> {
                           builder: (_) => const EmployeeListScreen(),
                         ),
                       );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.fingerprint, color: Colors.orange),
+                    title: const Text('Xác thực Sinh trắc học'),
+                    subtitle: const Text('Demo và test tính năng bảo mật'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BiometricAuthExample(),
+                        ),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.security, color: Colors.blue),
+                    title: const Text('Xác thực Đơn giản'),
+                    subtitle: const Text('Giao diện xác thực sinh trắc học đơn giản'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BiometricAuthPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.timer, color: Colors.green),
+                    title: const Text('Test Thời lượng sử dụng'),
+                    subtitle: const Text('Demo cảnh báo và giới hạn sử dụng'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showUsageTestDialog();
                     },
                   ),
                   ListTile(

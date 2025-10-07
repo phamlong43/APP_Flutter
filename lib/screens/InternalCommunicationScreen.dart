@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'PostEditScreen.dart';
+import '../config/api_config.dart';
 
 class InternalCommunicationScreen extends StatefulWidget {
   final bool isAdmin;
@@ -14,7 +15,7 @@ class InternalCommunicationScreen extends StatefulWidget {
 class _InternalCommunicationScreenState extends State<InternalCommunicationScreen> {
   // Đã nhận isAdmin từ widget.isAdmin
   Future<void> likePost(int postId) async {
-    final url = Uri.parse('http://10.0.2.2:8080/api/posts/$postId/like');
+    final url = Uri.parse('${ApiConfig.postsEndpoint}/$postId/like');
     try {
       final res = await http.post(url);
       if (res.statusCode == 200) {
@@ -24,7 +25,7 @@ class _InternalCommunicationScreenState extends State<InternalCommunicationScree
   }
 
   Future<void> sharePost(int postId) async {
-    final url = Uri.parse('http://10.0.2.2:8080/api/posts/$postId/share');
+    final url = Uri.parse('${ApiConfig.postsEndpoint}/$postId/share');
     try {
       final res = await http.post(url);
       if (res.statusCode == 200) {
@@ -45,7 +46,7 @@ class _InternalCommunicationScreenState extends State<InternalCommunicationScree
   Future<void> fetchPosts() async {
     setState(() { isLoading = true; });
     try {
-      final res = await http.get(Uri.parse('http://10.0.2.2:8080/api/posts'));
+      final res = await http.get(Uri.parse(ApiConfig.postsEndpoint));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data is List) {
@@ -292,7 +293,7 @@ class _InternalCommunicationScreenState extends State<InternalCommunicationScree
     );
   }
   Future<void> deletePost(int postId) async {
-    final url = Uri.parse('http://10.0.2.2:8080/api/posts/$postId');
+    final url = Uri.parse('${ApiConfig.postsEndpoint}/$postId');
     try {
       final res = await http.delete(url);
       if (res.statusCode == 200) {
